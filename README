@@ -1,0 +1,119 @@
+
+################################
+# Create the Dataset
+################################
+Note: whole process can be run with generateDataSet.pl
+
+1) semmedDB2MAt_withPMIDs.pl
+
+   Converts the semmedDB matrix into a flat file, where each line
+   contains: CUI PRED CUI PMID
+
+2) applyDateRange.pl
+
+   Creates a file of predicates that fall within the date range 
+   specified. For NN_LBD we use [1975-2009) for the pre-cutoff 
+   set, and (2010-2018) for the post-cutoff set
+
+3) findGenericCuis.pl
+
+   Creates a file containing generic cuis. These are CUIs specified
+   in SemMedDB as being not novel, and therefore are too generic
+   to provide any useful information
+
+4) filterDataSet.pl
+
+   Removes unwanted CUIs (generic CUIs) and unwanted relation types 
+   (negative relations) from the SemMedDB matrix file
+
+5) convertToCUIPredicateAll.pl
+
+   Converts the SemMedDB matrix file from: CUI PRED CUI PMID on each
+   line to CUI PRED CUI COUNT format, where count is the number of 
+   PMIDs that predicate triplet occurrs
+
+6) createTestAndTrain.pl <-Sam
+
+   TODO - implement this
+   Creates true, false, and known datasets from the input SemMedDB 
+   matrix file
+   TODO - rememember to only use vocabulary from the pre-cutoff dataset
+
+
+TODO are these the correct files? a training false as well?
+DONE, at this point there should be a trainingMatrix, test_true, test_false, and test_known matrix
+
+
+############################
+# Get Data Statistics
+###########################
+
+7) getDataStats.pl <- Clint
+
+   TODO-implement this
+   Gets stats about the data # true, #false, #known, counts for each rel. type, average rels per cui, etc
+
+
+
+#########################
+# Create Input Vectors
+#########################
+
+1) Create word2vec vectors
+
+   Use the Word2vecInterface package to create	
+   word2vec vectors for 1975-2009
+
+#TODO - implement this
+2) createOneHotVectors.pl <-Megan
+
+   Creates one-hot binary vectors for each term in the SemMedDB matrix
+   that the NN trains on.
+   
+   These are sparse vectors of format cui<>index,value\n
+
+
+#TODO - implement this
+3) createOneHotRelVectors.pl <-Megan, Clint to make real-valued W2v vectors
+
+   Creates one-hot binary vectors for each relation type in the SemMedDB
+   matrix that the NN trains on.
+
+
+#########################
+# Get Results
+#########################
+
+1) TODO - this is where we need to work, I think we should have a 
+
+trainNN.pl <- clint
+
+input is a config file, training data (semmeddb), vectors (sparse or dense)
+It will construct the NN based on config, divide the training data into folds
+and output the training error and trained NN
+
+NN output format is specified by Keras
+
+
+classify.pl <- megan
+
+input a trained network, true dataset and false dataset, vectors
+It will classify each true sample and each false sample
+output classifications 
+
+
+
+evaluate.pl <- clint/megan whoever gets done first
+
+...this takes as input a classification file, a true file, and a false file
+and generates an ROC curve based on true/false predictions. Also calculate ROC
+and MCC? Accuracy, etc?  
+
+we can generate different classification files depending on parameters and 
+re-use the generateROCCurve code. We can filter the classification files to 
+remove different semantic types and relation types to get stats for those
+
+
+
+
+
