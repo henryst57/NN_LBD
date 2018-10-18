@@ -86,7 +86,7 @@ sub outputDataset {
 # Specific Format:
 #    SUBJECT_CUI\tPRED_TYPE\tOBJECT_CUI\tOBJECT_CUI\t...\n
 # and returns a hash of hashes of format:
-#    hash{SUBJECT_CUI}{PRED_TYPE}{OBJECT_CUI}=1;
+#    hash{SUBJECT_CUI,PRED_TYPE,OBJECT_CUI}=1;
 sub readSemMedFile {
     my $fileName = shift;
 
@@ -111,6 +111,8 @@ sub readSemMedFile {
 
     return \%dataSet;
 }
+
+
 
 
 ####################################################
@@ -160,6 +162,8 @@ sub readDenseVectorFile {
     #return the hash
     return \%vectors
 }
+
+
 
 
 #Reads vectors from a sparse vector file.

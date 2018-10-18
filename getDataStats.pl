@@ -14,9 +14,6 @@
 #    prints statistics to screen (or file?)
 #
 
-
-#TODO - implement me, see utlities.pm for loading data
-
 #######################################################################################################
 #                                                                                                     #
 #    Main                                                                                             #
@@ -70,21 +67,20 @@ sub Load_Data
     while( my $line = <IN> )
     {
         $line = uc( $line );
-        my @data = split( ',', $line );
+        my @data = split( /\t/, $line );
         
         my $subject_CUI  = shift @data;
         my $predicate    = "";
-        my @subject_data = split( ' ', $data[-1] );
-        
-        $predicate = shift( @subject_data );
-        
+
+	$predicate = shift( @data );
+       
         my $predicate_hash_ref = undef;
         my $object_hash_ref    = undef;
         
         # Check If Predicate Hash Already Exists
         $predicate_hash_ref = $data_hash{ "$subject_CUI" };
         
-        for my $object_CUI ( @subject_data )
+	for my $object_CUI (@data)
         {
             if( keys %{ $predicate_hash_ref } == 0 )
             {
@@ -122,7 +118,7 @@ sub Load_Data
 }
 
 sub Generate_Results
-{
+{    
     my $data_hash_ref = shift;
     
     # Check(s)
