@@ -53,11 +53,11 @@ sub outputDataset {
 	my $objectCUI = $vals[2];
 
 	#add to the hash
-	if (!defined $outputHash{"$subjectCUI,$relationType"}) {
+	if (!defined $outputHash{"$subjectCUI\t$relationType"}) {
 	    my @newArray = ();
-	    $outputHash{"$subjectCUI,$relationType"} = \@newArray;
+	    $outputHash{"$subjectCUI\t$relationType"} = \@newArray;
 	}
-	push @{$outputHash{"$subjectCUI,$relationType"}}, $objectCUI;
+	push @{$outputHash{"$subjectCUI\t$relationType"}}, $objectCUI;
 
     }
 

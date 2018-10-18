@@ -1,0 +1,98 @@
+# CNDA - CUI-Neural-net-Discovery-Approximator
+
+Pronounced 'Canada' - A neural network that takes SemRep relationships to predict new CUI relationships. 
+
+## Getting Started
+
+Download CNDA.py and the data folder. Keep the file and the folder in the same directory
+
+### Prerequisites
+
+#### Libraries
+* [Python 3.4.3 or higher](https://www.python.org/downloads/)
+* [Numpy and Scipy](https://scipy.org/install.html)
+* [Tensorflow 1.3.0](https://www.tensorflow.org/install/install_linux)
+* [Keras 2.0.9](https://keras.io/#installation)
+
+#### Local files
+* CNDA.py
+* Data files named in the form 'cui_[name]' in the 'data/' directory
+```
+data/cui_predicates1985-1987
+```
+* Data contents in the form _CUI	PREDICATE	CUI1	CUI2	CUI3...CUIN_ (tab separated)
+
+```
+C002	TREATS	C005	C006	C010
+```
+
+## Running
+
+#### Default
+
+Running ```python3 CNDA.py``` just runs the 'cui_sanity' data file to test the neural network functionality
+
+#### Parameters
+
+* Data File - the data set to use found under 'data/' directory
+* Input test CUI - the input CUI to test for similarity
+* Output test CUI - the output CUI to test for its rank within the predictions for the CUI input
+* (optional) Batch size - the size of the batches to break the data sets into
+
+#### Example command
+```
+python3 CNDA.py cui_mini C003 C002 3
+```
+
+## Output
+
+#### Console
+
+The program outputs the following to the console: 
+
+* Weight ratio (GCF 0:1 in the one-hot vector)
+* Base loss, accuracy, precision, and recall
+* Trained loss, accuracy, precision, and recall / epoch
+* Time to Train (seconds)
+* Ranks for Test Input Cui vs. Test Output Cui relative to the rest of the cuis
+
+
+#### Local Files
+
+The program outputs the following to local files in the same directory of CNDA.py:
+
+* data/[filename]_CUI_KEY - key indexes for the cuis used in the data set
+* predict_data/[filename] - prediction data directory for the data set used 
+* predict_data/[filename]/sorted/ - sorted predictions directory
+* predicate prediction files - predictions for every predicate found in the data set (in the form '[filename]_[PREDICATE]') under predict_data/ and sorted/
+
+## Version
+
+Version 0.8
+
+## Authors
+
+* **Megan Charity** - Virginia Commonwealth University - charityml@vcu.edu
+* **Sam Henry** - Virginia Commonwealth University - henryst@vcu.edu
+* **Bridget T McInnes** - Virginia Commonwealth University - btmcinnes@vcu.edu
+
+## License
+
+Copyright (C) 2017 Megan Charity & Sam Henry & Bridget T. McInnes
+
+    Permission is granted to copy, distribute and/or modify this document
+    under the terms of the GNU Free Documentation License, Version 1.2 or
+    any later version published by the Free Software Foundation; with no
+    Invariant Sections, no Front-Cover Texts, and no Back-Cover Texts.
+
+    Note: a copy of the GNU Free Documentation License is available on the
+    web at:
+
+    <http://www.gnu.org/copyleft/fdl.html>
+
+    and is included in this distribution as FDL.txt.
+
+
+## Acknowledgments
+
+* Network as proposed by Rumelhart, et al. 1993 adapted for use with SemRep
