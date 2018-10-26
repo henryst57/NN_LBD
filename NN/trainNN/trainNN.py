@@ -28,7 +28,8 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sparse
 import keras.backend as K
-from tensorflow.python import keras
+#from tensorflow.python import keras
+import keras
 from keras.models import Model, model_from_json, load_model
 from keras import optimizers
 from keras.utils.vis_utils import plot_model
