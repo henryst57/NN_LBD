@@ -4,4 +4,4 @@
 #TODO implement me
 print "Executing Evaluate NN Python Script\n";
 
-system( "python evaluateNN.py config2.cfg" );
+system( "python evaluateNN.py ../../../data/config/config2.cfg" );
