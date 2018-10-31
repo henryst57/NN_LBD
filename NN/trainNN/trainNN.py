@@ -27,8 +27,9 @@ import tensorflow as tf
 import numpy as np
 import pandas as pd
 import scipy.sparse as sparse
+import keras
 import keras.backend as K
-from tensorflow.python import keras
+#from tensorflow.python import keras
 from keras.models import Model, model_from_json, load_model
 from keras import optimizers
 from keras.utils.vis_utils import plot_model
@@ -70,7 +71,7 @@ predicate_list_file             = ""
 print_input_matrices            = 0
 print_matrix_generation_stats   = 0
 adjust_for_unidentified_vectors = 0
-cui_dense_input_mode            = False
+cui_dense_input_mode            = True
 predicate_dense_input_mode      = False
 train_file_data_length          = 0
 actual_train_data_length        = 0
@@ -91,7 +92,7 @@ unidentified_cuis             = []             # CUIs Not Found In Unique CUI Li
 unidentified_predicates       = []             # Predicates Not Found In Unique CUI List During Matrix Generation
 
 # Debug Log Variables
-debug_log                        = False
+debug_log                        = True
 write_log                        = False
 debug_file_name                  = "nnlbd_log.txt"
 debug_log_file                   = None
@@ -102,6 +103,12 @@ debug_log_file                   = None
 #    Sub-Routines                                                                          #
 #                                                                                          #
 ############################################################################################
+
+def testMe():
+    print("TRAINN --- YEEEEE!")
+
+def testMe2():
+    return "s'mores poptart"
 
 #   Print Statements To Console, Debug Log File Or Both
 def PrintLog( print_str ):
@@ -1474,61 +1481,66 @@ def CleanUp():
 #                                                                                          #
 ############################################################################################
 
-# Check(s)
-if( len( sys.argv ) < 2 ):
-    print( "Main() - Error: No Configuration File Argument Specified" )
-    exit()
+def main():
 
-result = ReadConfigFile( sys.argv[1] )
+    # Check(s)
+    if( len( sys.argv ) < 2 ):
+        print( "Main() - Error: No Configuration File Argument Specified" )
+        exit()
 
-# Read CUIs and Predicates From The Same Vector Data File
-if( concept_vector_file is not "" and concept_vector_file == predicate_vector_file ):
-    result = LoadVectorFileUsingPredicateList( concept_vector_file, predicate_list_file )
+    result = ReadConfigFile( sys.argv[1] )
 
-    if( result == -1 ): exit()
+    # Read CUIs and Predicates From The Same Vector Data File
+    if( concept_vector_file is not "" and concept_vector_file == predicate_vector_file ):
+        result = LoadVectorFileUsingPredicateList( concept_vector_file, predicate_list_file )
 
-# Read CUIs and Predicates From Differing Vector Data Files
-else:
-    cui_file_loaded       = LoadVectorFile( concept_vector_file,   True )
-    predicate_file_loaded = LoadVectorFile( predicate_vector_file, False )
+        if( result == -1 ): exit()
 
-    if( cui_file_loaded == -1 or predicate_file_loaded == -1 ):
-        PrintLog( "Main() - Error: Unable To Load Vector File(s) / Auto-Generating One-Hot Vectors Using Co-Occurrence Data" )
+    # Read CUIs and Predicates From Differing Vector Data Files
+    else:
+        cui_file_loaded       = LoadVectorFile( concept_vector_file,   True )
+        predicate_file_loaded = LoadVectorFile( predicate_vector_file, False )
 
-# Set Numpy Print Options/Length To "MAXSIZE" ( Used To Debug GenerateNetworkMatrices() Function )    @REMOVEME
-# np.set_printoptions( threshold = sys.maxsize )
+        if( cui_file_loaded == -1 or predicate_file_loaded == -1 ):
+            PrintLog( "Main() - Error: Unable To Load Vector File(s) / Auto-Generating One-Hot Vectors Using Co-Occurrence Data" )
 
-result = GetConceptUniqueIdentifierData()
+    # Set Numpy Print Options/Length To "MAXSIZE" ( Used To Debug GenerateNetworkMatrices() Function )    @REMOVEME
+    # np.set_printoptions( threshold = sys.maxsize )
 
-if( result == -1 ):
-    PrintLog( "Main() - Error: Failed To Auto-Generate Sparse CUI/Predicate Data" )
-    exit()
+    result = GetConceptUniqueIdentifierData()
 
-AdjustVectorIndexData()
+    if( result == -1 ):
+        PrintLog( "Main() - Error: Failed To Auto-Generate Sparse CUI/Predicate Data" )
+        exit()
 
-if( result == -1 ):
-    PrintLog( "Main() - Error: Failed To Adjust CUI/Predicate Indexing Data" )
-    exit()
-    
-PrintKeyFiles()
+    AdjustVectorIndexData()
 
-if( result == -1 ):
-    PrintLog( "Main() - Error: Failed To Print CUI/Predicate Data Key Files" )
-    exit()
+    if( result == -1 ):
+        PrintLog( "Main() - Error: Failed To Adjust CUI/Predicate Indexing Data" )
+        exit()
+        
+    PrintKeyFiles()
 
-CUI_OneHot_Input, predicate_input, cui_output = GenerateNetworkMatrices()
+    if( result == -1 ):
+        PrintLog( "Main() - Error: Failed To Print CUI/Predicate Data Key Files" )
+        exit()
 
-if( CUI_OneHot_Input != None and predicate_input != None and cui_output != None ):
-    ProcessNeuralNetwork( CUI_OneHot_Input, predicate_input, cui_output )
-else:
-    PrintLog( "Main() - Error: One Or More Input/Output Matrices Failed Generation / One Or More Matrices == None" )
-    CUI_OneHot_Input = None
-    predicate_input  = None
-    cui_output       = None
+    CUI_OneHot_Input, predicate_input, cui_output = GenerateNetworkMatrices()
 
-# Garbage Collection / Free Unused Memory
-CleanUp()
+    if( CUI_OneHot_Input != None and predicate_input != None and cui_output != None ):
+        ProcessNeuralNetwork( CUI_OneHot_Input, predicate_input, cui_output )
+    else:
+        PrintLog( "Main() - Error: One Or More Input/Output Matrices Failed Generation / One Or More Matrices == None" )
+        CUI_OneHot_Input = None
+        predicate_input  = None
+        cui_output       = None
 
-CloseDebugFileHandle()
+    # Garbage Collection / Free Unused Memory
+    CleanUp()
 
-print( "~Fin" )
+    CloseDebugFileHandle()
+
+    print( "~Fin" )
+
+if __name__ == "__main__":
+    main()

@@ -28,6 +28,9 @@ import re
 import gc
 import time
 
+#reference Clint's code
+sys.path.append('../trainNN')
+from trainNN import BCE, CCE, Matthews_Correlation, Precision, Recall, Batch_Gen
 
 
 
@@ -55,6 +58,13 @@ cui_occurence_data_length = 0
 number_of_cuis = 0
 number_of_predicates = 0
 
+# Stats Variables
+identified_cuis               = []             # CUIs Found In Unique CUI List During Matrix Generation
+identified_predicates         = []             # Predicates Found In Unique CUI List During Matrix Generation
+unidentified_cuis             = []             # CUIs Not Found In Unique CUI List During Matrix Generation
+unidentified_predicates       = []             # Predicates Not Found In Unique CUI List During Matrix Generation
+actual_train_data_length        = 0
+cui_dense_input_mode            = False
 
 #############      FUNCTIONS       ################
 
@@ -144,6 +154,10 @@ def GenerateNetworkMatrices():
 	global steps
 	global number_of_cuis
 	global number_of_predicates
+	global identified_cuis
+	global unidentified_cuis
+	global actual_train_data_length
+	global cui_dense_input_mode
 
 	print_input_matrices = 0
 
@@ -171,6 +185,8 @@ def GenerateNetworkMatrices():
 
 	print( "GenerateNetworkMatrices() - Generating Network Matrices" )
 
+	number_of_unique_cui_inputs       = 0
+	number_of_unique_predicate_inputs = 0
 	concept_input_indices   = []
 	predicate_input_indices = []
 	concept_output_indices  = []
@@ -179,6 +195,10 @@ def GenerateNetworkMatrices():
 
 	# Parses each line of raw data input and adds them to arrays for matrix generation
 	print( "GenerateNetworkMatrices() - Parsing CUI Data / Generating Network Input-Output Data Arrays" )
+	
+	index = 0
+	number_of_skipped_lines = 0
+
 	for i in range( cui_occurence_data_length ):
 		not_found_flag = False
 		line = cui_occurence_data[i]
@@ -189,28 +209,90 @@ def GenerateNetworkMatrices():
 		# Check(s)
 		# If Subject CUI, Predicate and Object CUIs Are Not Found Within The Specified Unique CUI and Predicate Lists, Report Error and Skip The Line
 		if( line_elements[0] not in unique_cui_data ):
-			print( "GenerateNetworkMatrices() - Error: Subject CUI \"" + str( line_elements[0] ) + "\" Is Not In Unique CUI Data List" )
+			print( "GenerateNetworkMatrices() - Error: Subject CUI \"" + str( line_elements[0] ) + "\" Is Not In Unique CUI Data List / Skipping Line " + str( i ) )
 			not_found_flag = True
+			if( line_elements[0] not in unidentified_cuis ): unidentified_cuis.append( line_elements[0] )
+		else:
+			if( line_elements[0] not in identified_cuis ):   identified_cuis.append( line_elements[0] )
 		if( line_elements[1] not in unique_predicate_data ):
-			print( "GenerateNetworkMatrices() - Error: Predicate \"" + str( line_elements[1] ) + "\" Is Not In Unique Predicate Data List" )
+			print( "GenerateNetworkMatrices() - Error: Predicate \"" + str( line_elements[1] ) + "\" Is Not In Unique Predicate Data List / Skipping Line " + str( i ) )
 			not_found_flag = True
+			if( line_elements[1] not in unidentified_predicates ): unidentified_predicates.append( line_elements[1] )
+		else:
+			if( line_elements[1] not in identified_predicates ): identified_predicates.append( line_elements[1] )
 		for element in line_elements[2:]:
 			if( element not in unique_cui_data ):
-				print( "GenerateNetworkMatrices() - Error: Object CUI \"" + str( element ) + "\" Is Not In Unique CUI Data List" )
+				print( "GenerateNetworkMatrices() - Error: Object CUI \"" + str( element ) + "\" Is Not In Unique CUI Data List / Skipping Line " + str( i ) )
 				not_found_flag = True
+				if( element not in unidentified_cuis ): unidentified_cuis.append( element )
+			else:
+				if( element not in identified_cuis ):   identified_cuis.append( element )
 
-		if( not_found_flag is True ): 
+		if( not_found_flag is True ):
+			number_of_skipped_lines += 1
 			continue
 
+		# Add Actual Found Data To Found Data Length ( Used For Batch_Gen() )
+		actual_train_data_length += 1
+		
+		subject_cui_index = unique_cui_data[ line_elements[0] ]
+		predicate_index   = unique_predicate_data[ line_elements[1] ]
+		
 		# Add Unique Element Indices To Concept/Predicate Input List
-		concept_input_indices.append( [i, unique_cui_data[ line_elements[0] ]] )
-		predicate_input_indices.append( [i, unique_predicate_data[ line_elements[1] ]] )
+		# Fetch CUI Sparse Indices (Multiple Indices Per Sparse Vector Supported / Association Vectors Supported)
+		if( cui_dense_input_mode is False ):
+			sparse_data  = cui_embedding_matrix[ subject_cui_index ]
+			sparse_data  = sparse_data.split( " " )
 
-		# Adds all Object CUI indices to the output CUI index array
+			# Add Subject CUI Indices and Values
+			for index_value_data in sparse_data:
+				data = index_value_data.split( ":" )
+				cui_vtr_index = int( data[0] )
+				cui_vtr_value = float( data[1] )
+				concept_input_indices.append( [ index, cui_vtr_index ] )
+				concept_input_values.append( cui_vtr_value )
+				
+				print( "GenerateNetworkMatrices() - Adding Index: " + str( index ) + ", Subject CUI Index: " + str( cui_vtr_index ) + ", Value: " + str( cui_vtr_value ) )
+
+			number_of_unique_cui_inputs += 1
+
+			# Add Predicate Input Indices and Values
+			predicate_data = predicate_embedding_matrix[ predicate_index ]
+			predicate_data = predicate_data.split( " " )
+
+			for index_value_element in predicate_data:
+				index_value = index_value_element.split( ":" )
+				pred_index  = int( index_value[0] )
+				pred_value  = float( index_value[1] )
+				predicate_input_indices.append( [ index, pred_index ] )
+				predicate_input_values.append( pred_value )
+				
+				print( "GenerateNetworkMatrices() - Adding Index: " + str( index ) + ", Predicate Index: " + str( cui_vtr_index ) + ", Value: " + str( cui_vtr_value ) )
+
+			number_of_unique_predicate_inputs += 1
+
+		# Dense Vector Support
+		else:
+			print( "GenerateNetworkMatrices() - Adding Index: " + str( index ) + ", Subject CUI Index: " + str( subject_cui_index ) + ", Value: 1" )
+			
+			concept_input_indices.append( [ index, subject_cui_index ] )
+			concept_input_values.append( 1 )
+
+			print( "GenerateNetworkMatrices() - Adding Index: " + str( index ) + ", Predicate Index: " + str( predicate_index ) + ", Value: 1" )
+			predicate_input_indices.append( [ index, predicate_index ] )
+			predicate_input_values.append( 1 )
+
+			number_of_unique_cui_inputs       += 1
+			number_of_unique_predicate_inputs += 1
+
+
+		# Adds All Object CUI Indices To The Output CUI Index Array
 		for element in line_elements[2:]:
-			concept_output_indices.append( [i, unique_cui_data[element]] )
+			print( "GenerateNetworkMatrices() - Adding Index: " + str( index ) + ", Object CUI Index: " + str( unique_cui_data[element] ) + ", Value: " + str( unique_cui_data[element] ) )
+			concept_output_indices.append( [ index, unique_cui_data[element] ] )
 			concept_output_values.append( unique_cui_data[element] )
-			output_cui_count += 1
+
+		index += 1
 
 
 	# Check(s)
@@ -224,17 +306,27 @@ def GenerateNetworkMatrices():
 		print( "GenerateNetworkMatrices() -        Note: This May Be Reporting Due To Concept Input or Predicate Indices List Erroring Out" )
 	if( len( concept_input_indices ) is 0 or len( predicate_input_indices ) is 0 or len( concept_output_indices ) is 0 ): return None, None, None
 
-	# Transpose the arrays, then convert to rows/columns
+
+	# Set Up Sparse Matrices To Include All Specified CUI/Predicate Vectors
+	matrix_cui_length       = len( identified_cuis )
+	matrix_predicate_length = len( identified_predicates )
+
+	# If Adjust For Unidentified Vectors == False, Then All Sparse Matrices Consist Of All Vectors In Vector Files
+	if( adjust_for_unidentified_vectors is 0 ):
+		matrix_cui_length       = len( unique_cui_data )
+		matrix_predicate_length = len( unique_predicate_data )
+
+	# Transpose The Arrays, Then Convert To Rows/Columns
 	print( "GenerateNetworkMatrices() - Transposing Index Data Arrays Into Row/Column Data" )
 	concept_input_row,   concept_input_column   = zip( *concept_input_indices   )
 	predicate_input_row, predicate_input_column = zip( *predicate_input_indices )
 	concept_output_row,  concept_output_column  = zip( *concept_output_indices  )
 
-	# Convert row/column data into sparse matrices
+	# Convert Row/Column Data Into Sparse Matrices
 	print( "GenerateNetworkMatrices() - Converting Index Data Into Matrices" )
-	concept_input_matrix   = sparse.csr_matrix( ( [1]*cui_occurence_data_length,    ( concept_input_row,   concept_input_column ) ),   shape = ( cui_occurence_data_length, number_of_cuis ) )
-	predicate_input_matrix = sparse.csr_matrix( ( [1]*cui_occurence_data_length,    ( predicate_input_row, predicate_input_column ) ), shape = ( cui_occurence_data_length, number_of_predicates ) )
-	concept_output_matrix  = sparse.csr_matrix( ( [1]*output_cui_count, ( concept_output_row,  concept_output_column ) ),  shape = ( cui_occurence_data_length, number_of_cuis ) )
+	concept_input_matrix   = sparse.csr_matrix( ( concept_input_values,               ( concept_input_row,   concept_input_column ) ),   shape = ( number_of_unique_cui_inputs,       matrix_cui_length ) )
+	predicate_input_matrix = sparse.csr_matrix( ( predicate_input_values,             ( predicate_input_row, predicate_input_column ) ), shape = ( number_of_unique_predicate_inputs, matrix_predicate_length ) )
+	concept_output_matrix  = sparse.csr_matrix( ( [1]*len( concept_output_indices ),  ( concept_output_row,  concept_output_column ) ),  shape = ( number_of_unique_cui_inputs,       matrix_cui_length ) )
 
 	if( print_input_matrices is 1 ):
 		print( "Compressed Sparse Matrix - Subject CUIs" )
@@ -282,6 +374,7 @@ def Evaluate(concept_input, predicate_input, concept_output, metricSet):
 	eval_metrics = model.evaluate_generator(generator = Batch_Gen([concept_input, predicate_input], concept_output, batch_size = batch_size ), steps = steps, verbose=1)
 
 
+'''
 
 #   Fixes The Input For A Sparse Matrix
 def Batch_Gen( X, Y, batch_size ):
@@ -375,7 +468,7 @@ def Matthews_Correlation( y_true, y_pred ):
 
 
 
-
+'''
 
 #########################
 # # #  GOOD STUFFS  # # #
