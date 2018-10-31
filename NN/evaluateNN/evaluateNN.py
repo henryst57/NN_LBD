@@ -139,7 +139,11 @@ def LoadModel():
 		custom_objects=customs)
 
 	#
+<<<<<<< HEAD
 	model.load_weights(model_weights_file)
+=======
+	|model.load_weights(model_weights_file)
+>>>>>>> 65fc62d37ce4c634a951ff4f841909a0b33f848f
 	print("Loaded the model from %s" % model_file)
 
 	model.summary()
@@ -402,8 +406,11 @@ def Evaluate(concept_input, predicate_input, concept_output, metricSet):
 
 	model = LoadModel()
 
+<<<<<<< HEAD
 	exit()
 
+=======
+>>>>>>> 65fc62d37ce4c634a951ff4f841909a0b33f848f
 	#get the model together
 	sgd = optimizers.SGD( lr = learning_rate, momentum = momentum )
 	model.compile(loss = BCE, optimizer = sgd, metrics = metricSet)
@@ -435,6 +442,7 @@ def main():
 	result = ReadConfigFile_EVAL( config_file )
 
 
+<<<<<<< HEAD
 	print("Startin' Evaluatin'....\n")
 
 	LoadModel()
@@ -442,6 +450,15 @@ def main():
 	exit()
 
 	#cui_input, predicate_input, cui_output = GenerateNetworkMatrices()
+=======
+	
+
+	print("Startin' Evaluatin'....\n")
+
+	#LoadModel()
+
+	cui_input, predicate_input, cui_output = GenerateNetworkMatrices()
+>>>>>>> 65fc62d37ce4c634a951ff4f841909a0b33f848f
 
 	'''
 	print(cui_input)
