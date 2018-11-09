@@ -43,6 +43,12 @@ model_weights_file          = ""
 eval_file                   = ""
 pred_key_file               = ""
 cui_key_file                = ""
+eval_output_file            = ""
+
+cui_occurence_data          = {}
+cui_occurence_data_length   = 0
+unique_cui_data             = {}
+unique_predicate_data       = {} 
 
 
 
@@ -55,6 +61,7 @@ def ReadConfigFile_EVAL( config_file_path ):
 	global eval_file
 	global pred_key_file
 	global cui_key_file
+	global eval_output_file
 
 	# Check(s)
 	if CheckIfFileExists( config_file_path ) == False:
@@ -85,6 +92,7 @@ def ReadConfigFile_EVAL( config_file_path ):
 		if data[0] == "EvaluateFile"        : eval_file             = str( data[1] )
 		if data[0] == "CUIKeyFile"          : cui_key_file          = str( data[1] )
 		if data[0] == "PredKeyFile"         : pred_key_file         = str( data[1] )
+		if data[0] == "EvalOut"             : eval_output_file      = str( data[1] )
 		
 	f.close()
 
@@ -111,6 +119,7 @@ def ReadConfigFile_EVAL( config_file_path ):
 	PrintLog( "    Model Weights File     : " + str( model_weights_file ) )
 	PrintLog( "    CUI Key File           : " + str( cui_key_file ) )
 	PrintLog( "    Predicate Key File     : " + str( pred_key_file ) )
+	PrintLog( "    Eval Output File       : " + str( eval_output_file ) )
 	
 	PrintLog( "=========================================================" )
 	PrintLog( "-                                                       -" )
@@ -149,24 +158,24 @@ def LoadModel():
 
 #imports the lines for the eval file
 def LoadEvalFile():
-	eval_data = []
+	global cui_occurence_data_length
+	global cui_occurence_data
+
 
 	#import the file for testing
 	try:
 		with open( eval_file, "r" ) as in_file:
-			eval_data = in_file.readlines()
+			cui_occurence_data = in_file.readlines()
 	except FileNotFoundError:
 		print ( "GetConceptUniqueIdentifierData() - Error: Unable To Open File \"" + str( eval_file )+ "\"" )
 		return -1
-	finally:
+	else:
 		in_file.close()
 
-	eval_data = [ line.strip() for line in eval_data ]  # Removes Trailing Space Characters From CUI Data Strings
-	eval_data.sort()
+	cui_occurence_data = [ line.strip() for line in cui_occurence_data ]  # Removes Trailing Space Characters From CUI Data Strings
+	cui_occurence_data.sort()
 
-	eval_len = len( eval_data )
-
-	return eval_data, eval_len
+	cui_occurence_data_length = len( cui_occurence_data )
 
 
 #loads the unique keys from the 
@@ -175,8 +184,9 @@ def LoadUniqKeys():
 	#   index id
 	#   1 C00023820     (cui)
 	#   1 AFFECTS       (pred)
-	cui_uniq = {}
-	pred_uniq = {}
+	global unique_cui_data
+	global unique_predicate_data
+
 
 
 	#read in cui key file
@@ -184,11 +194,11 @@ def LoadUniqKeys():
 		with open( cui_key_file, "r" ) as cui_in_file:
 			for line in cui_in_file:
 				(index, cuiVal) = line.split()
-				cui_uniq[str(cuiVal)] = int(index)
+				unique_cui_data[str(cuiVal)] = int(index)
 	except FileNotFoundError:
 		print ( "LoadUniqKeys() - Error: Unable To Open File \"" + str( cui_key_file )+ "\"" )
 		return -1
-	finally:
+	else:
 		cui_in_file.close()
 
 	#read in pred key file
@@ -196,14 +206,12 @@ def LoadUniqKeys():
 		with open( pred_key_file, "r" ) as pred_in_file:
 			for line in pred_in_file:
 				(index, predVal) = line.split()
-				pred_uniq[str(predVal)] = int(index)
+				unique_predicate_data[str(predVal)] = int(index)
 	except FileNotFoundError:
 		print ( "LoadUniqKeys() - Error: Unable To Open File \"" + str( pred_key_file )+ "\"" )
 		return -1
-	finally:
+	else:
 		pred_in_file.close()
-
-	return cui_uniq, pred_uniq
 
 
 
@@ -224,8 +232,8 @@ def GenerateNetworkMatrices():
 	print_input_matrices = 0
 
 
-	cui_occurence_data, cui_occurence_data_length = LoadEvalFile()
-	unique_cui_data, unique_predicate_data = LoadUniqKeys()
+	LoadEvalFile()
+	LoadUniqKeys()
 	number_of_cuis = len(unique_cui_data)
 	number_of_predicates = len(unique_predicate_data)
 
@@ -382,14 +390,10 @@ def GenerateNetworkMatrices():
 
 
 
-
-
-
-
-
-
 #evaluates the data on the loaded model
 def Evaluate(concept_input, predicate_input, concept_output, metricSet):
+	global eval_output_file
+
 	 # Check(s)
 	if( concept_input is None ):
 		print( "Evaluate() - Error: Concept Input Contains No Data" )
@@ -406,6 +410,12 @@ def Evaluate(concept_input, predicate_input, concept_output, metricSet):
 	sgd = optimizers.SGD( lr = learning_rate, momentum = momentum )
 	model.compile(loss = BCE, optimizer = sgd, metrics = metricSet)
 	eval_metrics = model.evaluate_generator(generator = Batch_Gen([concept_input, predicate_input], concept_output, batch_size = batch_size ), steps = steps, verbose=1)
+	
+	#export to file
+	f = open(eval_output_file, "w+")
+	f.write("EVALUATION METRICS:\n")
+	for m in range(len(metricSet)):
+		f.write(str(metricSet[m]) + ": " + str(eval_metrics[m]) + "\n")
 
 
 
