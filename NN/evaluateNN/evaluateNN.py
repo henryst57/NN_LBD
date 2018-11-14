@@ -228,6 +228,8 @@ def GenerateNetworkMatrices():
 	global unidentified_cuis
 	global actual_train_data_length
 	global cui_dense_input_mode
+	global unique_cui_data
+	global unique_predicate_data
 
 	print_input_matrices = 0
 
