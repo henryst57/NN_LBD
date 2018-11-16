@@ -2,37 +2,51 @@
 ################################
 # Create the Dataset
 ################################
-Note: whole process can be run with generateDataSet.pl
+Note: whole process (starting at step 5) can be run with generateDataSet.pl
+1) Download the latest release of SemMedDB
 
-1) semmedDB2MAt_withPMIDs.pl
+2) Gunzip the release
+   
+   gunzip <mysqlFileName>.sql.gz
+
+3) Create a new databse to output the .sql file to
+   
+   mysql
+   CREATE DATABASE <newDBName>
+   
+4) unpack the .sql file to mysql
+
+   mysql <newDBName> < <mysqlFileName>.sql
+
+5) semmedDB2MAt_withPMIDs.pl
 
    Converts the semmedDB matrix into a flat file, where each line
    contains: CUI PRED CUI PMID
 
-2) applyDateRange.pl
+6) applyDateRange.pl
 
    Creates a file of predicates that fall within the date range 
    specified. For NN_LBD we use [1975-2009) for the pre-cutoff 
    set, and (2010-2018) for the post-cutoff set
 
-3) findGenericCuis.pl
+7) findGenericCuis.pl
 
    Creates a file containing generic cuis. These are CUIs specified
    in SemMedDB as being not novel, and therefore are too generic
    to provide any useful information
 
-4) filterDataSet.pl
+8) filterDataSet.pl
 
    Removes unwanted CUIs (generic CUIs) and unwanted relation types 
    (negative relations) from the SemMedDB matrix file
 
-5) convertToCUIPredicateAll.pl
+9) convertToCUIPredicateAll.pl
 
    Converts the SemMedDB matrix file from: CUI PRED CUI PMID on each
    line to CUI PRED CUI COUNT format, where count is the number of 
    PMIDs that predicate triplet occurrs
 
-6) createTestAndTrain.pl <-Sam
+10) createTestAndTrain.pl <-Sam
 
    TODO - implement this
    Creates true, false, and known datasets from the input SemMedDB 
