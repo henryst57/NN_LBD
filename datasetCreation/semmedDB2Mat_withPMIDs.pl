@@ -29,6 +29,10 @@ sub convert {
     $dbh = DBI->connect($dsn, $userid, $password, \%thingy) or die $DBI::errstr;
     $dbh->{InactiveDestroy} = 1; #allows forking of threads containing this DB connect
 
+    #Code to connect without a username or password
+    #my $dsn = "DBI:mysql:$database;mysql_read_default_group=client;";
+    #my $dbh = DBI->connect($dsn);
+
     #set the query to get all cui pairs of the specified predicate types
     my $query =  'SELECT SUBJECT_CUI, PREDICATE, OBJECT_CUI, PMID FROM semmedVER30.PREDICATION';
 
