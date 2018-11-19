@@ -49,7 +49,10 @@ cui_occurence_data          = {}
 cui_occurence_data_length   = 0
 unique_cui_data             = {}
 unique_predicate_data       = {} 
-
+identified_cuis = []
+identified_predicates = []
+unidentified_cuis = []
+unidentified_predicates = []
 
 
 
