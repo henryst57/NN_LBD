@@ -5,7 +5,7 @@
 #    -------------------------------------------                                           #
 #                                                                                          #
 #    Date:    10/02/2018                                                                   #
-#    Revised: 11/16/2018                                                                   #
+#    Revised: 11/21/2018                                                                   #
 #                                                                                          #
 #    Generates A Neural Network Using A Configuration File.                                #
 #      - Supports Dense and Sparse Input Vectors In All Combinations Of CUI and            #
@@ -88,7 +88,7 @@ train_file_data_length          = 0
 actual_train_data_length        = 0
 cui_vector_length               = 0
 predicate_vector_length         = 0
-curr_training_index             = 0
+curr_training_data_index        = 0
 
 # CUI/Predicate Data
 training_data                   = []
@@ -1209,18 +1209,46 @@ def GetObjectOneHotCUIVector( cui ):
     vector[object_cui_index] = 1
     return vector
 
+#   Fixes The Input For A Sparse Matrix
+def Batch_Gen( X, Y, batch_size ):
+    samples_per_epoch = train_file_data_length
+    number_of_batches = samples_per_epoch / batch_size      # determines how many batches based on the batch_size specified and the size of the dataset
+    counter = 0
+
+    # Get Randomly Shuffled Data From The Sparse Matrix
+    shuffle_index = np.arange( np.shape( Y )[0] )                   # Where To Start The Random Index
+    np.random.shuffle( shuffle_index )
+    for x2 in X:                        # 2 parts - cui_in and pred_in
+        x2 = x2[shuffle_index, :]
+    Y = Y[shuffle_index, :]             # matching Y output
+
+    # Shuffle Until The Epoch Is Finished
+    while 1:
+        index_batch = shuffle_index[ batch_size * counter : batch_size * ( counter + 1 ) ]
+        X_batches = []
+        for x2 in X:
+            X_batches.append( x2[index_batch, :].todense() )    # unpack the matrix so it can be read into the NN
+        y_batch = Y[index_batch, :].todense()                   # unpack the output
+        counter += 1
+
+        yield( X_batches, np.asarray( y_batch ) )               # feed into the neural network
+
+        if( counter < number_of_batches ):                      # shuffle again
+            np.random.shuffle( shuffle_index )
+            counter = 0
+
 #   Parses Through CUI Data And Generates Sparse Matrices For
 #   Concept Input, Predicate Input and Concept Output Data
-def GenerateNetworkData():
+def GenerateNetworkData( start_index = None, end_index = None ):
     global steps
     global batch_size
     global identified_cuis
     global unidentified_cuis
-    global curr_training_index
     global print_network_inputs
     global identified_predicates
     global unidentified_predicates
     global actual_train_data_length
+    global curr_training_data_index
     global print_matrix_generation_stats
 
     # Check(s)
@@ -1253,10 +1281,15 @@ def GenerateNetworkData():
     index                   = 0
     number_of_skipped_lines = 0
     
+    # Parse Entire File If Start And Ending Indices Are Not Specified
+    if( start_index is None and end_index is None ):
+        temp_data = training_data
+        PrintLog( "GenerateNetworkData() - Warning: No Start-End Indices Specified / Generating Matrices Using All Training Data" )
+    else:
     # Fetch Training Data In Batch
-    temp_data = training_data[curr_training_index:( curr_training_index + batch_size )]
-    
-    print( "Curr Training Index: " + str( curr_training_index ) + " - End Index: " + str( curr_training_index + len( temp_data ) ) )
+        temp_data = training_data[start_index:end_index]
+        PrintLog( "GenerateNetworkData() - Training Data Start Index: " + str( start_index ) + " - End Index: " + str( end_index ) )
+        
 
     for i in range( len( temp_data ) ):
         not_found_flag = False
@@ -1267,20 +1300,20 @@ def GenerateNetworkData():
         # Check(s)
         # If Subject CUI, Predicate and Object CUIs Are Not Found Within The Specified Unique CUI and Predicate Lists, Report Error and Skip The Line
         if( line_elements[0] not in unique_cui_data ):
-            PrintLog( "GenerateNetworkData() - Warning: Subject CUI \"" + str( line_elements[0] ) + "\" Is Not In Unique CUI Data List / Skipping Line " + str( curr_training_index + index ) )
+            PrintLog( "GenerateNetworkData() - Warning: Subject CUI \"" + str( line_elements[0] ) + "\" Is Not In Unique CUI Data List / Skipping Line " + str( curr_training_data_index + i ) )
             not_found_flag = True
             if( line_elements[0] not in unidentified_cuis ): unidentified_cuis.append( line_elements[0] )
         else:
             if( line_elements[0] not in identified_cuis ):   identified_cuis.append( line_elements[0] )
         if( line_elements[1] not in unique_predicate_data ):
-            PrintLog( "GenerateNetworkData() - Warning: Predicate \"" + str( line_elements[1] ) + "\" Is Not In Unique Predicate Data List / Skipping Line " + str( curr_training_index + index ) )
+            PrintLog( "GenerateNetworkData() - Warning: Predicate \"" + str( line_elements[1] ) + "\" Is Not In Unique Predicate Data List / Skipping Line " + str( curr_training_data_index + i ) )
             not_found_flag = True
             if( line_elements[1] not in unidentified_predicates ): unidentified_predicates.append( line_elements[1] )
         else:
             if( line_elements[1] not in identified_predicates ): identified_predicates.append( line_elements[1] )
         for element in line_elements[2:]:
             if( element not in unique_cui_data ):
-                PrintLog( "GenerateNetworkData() - Warning: Object CUI \"" + str( element ) + "\" Is Not In Unique CUI Data List / Skipping Line " + str( curr_training_index + index ) )
+                PrintLog( "GenerateNetworkData() - Warning: Object CUI \"" + str( element ) + "\" Is Not In Unique CUI Data List / Skipping Line " + str( curr_training_data_index + i ) )
                 not_found_flag = True
                 if( element not in unidentified_cuis ): unidentified_cuis.append( element )
             else:
@@ -1356,7 +1389,7 @@ def GenerateNetworkData():
 
     
     # Set Global Variable
-    curr_training_index += len( temp_data )
+    curr_training_data_index += len( temp_data )
 
     # Check(s)
     if( len( concept_input_indices ) is 0 ):
@@ -1760,7 +1793,7 @@ def NetworkPredictOutput( model, cui_input, predicate_input ):
 
 #   Trains The Neural Network Using Specified Concept/Predicate Input/Output Matrix Parameters
 def ProcessNeuralNetwork():
-    global curr_training_index
+    global curr_training_data_index
     
     # Train The Neural Network Using Specified Input/Output Matrices
     PrintLog( "ProcessNeuralNetwork() - Generating Actual Neural Network" )
@@ -1774,7 +1807,7 @@ def ProcessNeuralNetwork():
     for curr_epoch in range( number_of_epochs ):
         while( number_of_remaining_elements > 0 ):
             PrintLog( "ProcessNeuralNetwork() - Current Epoch: " + str( curr_epoch ) + "/" + str( number_of_epochs ) )
-            cui_input, predicate_input, cui_output = GenerateNetworkData()
+            cui_input, predicate_input, cui_output = GenerateNetworkData( curr_training_data_index, curr_training_data_index + batch_size )
             
             PrintLog( "ProcessNeuralNetwork() - Passing Input/Output Sequences/Matrices To Network" )
             TrainNeuralNetwork( model, curr_epoch, cui_input, predicate_input, cui_output )
@@ -1785,7 +1818,7 @@ def ProcessNeuralNetwork():
             
             if( debug_log is 0 ): print( "\n" )
         
-        curr_training_index          = 0
+        curr_training_data_index     = 0
         number_of_remaining_elements = train_file_data_length
 
     PrintLog( "ProcessNeuralNetwork() - Training Time: %s secs" % ( time.time() - start_time ) )
@@ -1864,42 +1897,48 @@ def CleanUp():
 if( len( sys.argv ) < 2 ):
     print( "Main() - Error: No Configuration File Argument Specified" )
     exit()
-
-if( ReadConfigFile( sys.argv[1] ) == -1 ): exit()
-
-# Read CUIs and Predicates From The Same Vector Data File
-if( concept_vector_file is not "" and concept_vector_file == predicate_vector_file ):
-    if( LoadVectorFileUsingPredicateList( concept_vector_file, predicate_list_file ) == -1 ):
+    
+def Main():
+    if( ReadConfigFile( sys.argv[1] ) == -1 ): exit()
+    
+    # Read CUIs and Predicates From The Same Vector Data File
+    if( concept_vector_file is not "" and concept_vector_file == predicate_vector_file ):
+        if( LoadVectorFileUsingPredicateList( concept_vector_file, predicate_list_file ) == -1 ):
+            exit()
+    
+    # Read CUIs and Predicates From Differing Vector Data Files
+    else:
+        cui_file_loaded       = LoadVectorFile( concept_vector_file,   True )
+        predicate_file_loaded = LoadVectorFile( predicate_vector_file, False )
+    
+        if( cui_file_loaded == -1 or predicate_file_loaded == -1 ):
+            PrintLog( "Main() - Error: Unable To Load Vector File(s) / Auto-Generating One-Hot Vectors Using Co-Occurrence Data" )
+    
+    # Set Numpy Print Options/Length To "MAXSIZE" ( Used To Debug GenerateNetworkData() Function )    @REMOVEME
+    # np.set_printoptions( threshold = sys.maxsize )
+    
+    if( GetConceptUniqueIdentifierData() == -1 ):
+        PrintLog( "Main() - Error: Failed To Auto-Generate Sparse CUI/Predicate Data" )
         exit()
+    
+    if( AdjustVectorIndexData() == -1 ):
+        PrintLog( "Main() - Error: Failed To Adjust CUI/Predicate Indexing Data" )
+        exit()
+    
+    if( PrintKeyFiles() == -1 ):
+        PrintLog( "Main() - Error: Failed To Print CUI/Predicate Data Key Files" )
+        exit()
+    
+    ProcessNeuralNetwork()
+    
+    # Garbage Collection / Free Unused Memory
+    CleanUp()
+    
+    CloseDebugFileHandle()
+    
+    print( "~Fin" )
 
-# Read CUIs and Predicates From Differing Vector Data Files
-else:
-    cui_file_loaded       = LoadVectorFile( concept_vector_file,   True )
-    predicate_file_loaded = LoadVectorFile( predicate_vector_file, False )
 
-    if( cui_file_loaded == -1 or predicate_file_loaded == -1 ):
-        PrintLog( "Main() - Error: Unable To Load Vector File(s) / Auto-Generating One-Hot Vectors Using Co-Occurrence Data" )
-
-# Set Numpy Print Options/Length To "MAXSIZE" ( Used To Debug GenerateNetworkData() Function )    @REMOVEME
-# np.set_printoptions( threshold = sys.maxsize )
-
-if( GetConceptUniqueIdentifierData() == -1 ):
-    PrintLog( "Main() - Error: Failed To Auto-Generate Sparse CUI/Predicate Data" )
-    exit()
-
-if( AdjustVectorIndexData() == -1 ):
-    PrintLog( "Main() - Error: Failed To Adjust CUI/Predicate Indexing Data" )
-    exit()
-
-if( PrintKeyFiles() == -1 ):
-    PrintLog( "Main() - Error: Failed To Print CUI/Predicate Data Key Files" )
-    exit()
-
-ProcessNeuralNetwork()
-
-# Garbage Collection / Free Unused Memory
-CleanUp()
-
-CloseDebugFileHandle()
-
-print( "~Fin" )
+# Main Function Call To Run TrainNN
+if __name__ == "__main__":
+    Main()
