@@ -1,6 +1,6 @@
 ############################################################################
 #                                                                          #
-#    NNLBD - Neural Network Literature Based Discovery v0.35               #
+#    NNLBD - Neural Network Literature Based Discovery v0.36               #
 #                                                                          #
 ############################################################################
 
@@ -154,21 +154,150 @@
     <NumberOfSteps>         -> Number Of Steps Value                                                                                       [ Type Int                                 ] (Not Used)
     <NumberOfEpochs>        -> Number Of Times To Iterate Over Training Data During Network Learning                                       [ Type Int   - Default: 5                  ]
     <TrainFile>             -> File To Train The Network                                                                                   [ Type String                              ]
+    <EvaluateFile>          -> Evaluation File (Must Be In Same Format As <TrainFile>)                                                     [ Type String                              ]
     <NegativeSampleRate>    -> Negative Sample Rate                                                                                        [ Type Int: Default: 5                     ] (Not Used/Reserved For Future)
     <PrintKeyFile>          -> Prints Key Files As Used By The Network                                                                     [ Type Int: 1 = True / 0 = False (Default) ]
     <ConceptVectorFile>     -> Subject CUI Vector File Used To Train The Network                                                           [ Type String                              ]
     <PredicateVectorFile>   -> Predicate Vector File Used To Train The Network                                                             [ Type String                              ]
     <PredicateListFile>     -> Predicate List File                                                                                         [ Type String                              ]
     <TrainingStatsFile>     -> File To Print Training Statistics To After Each Epoch                                                       [ Type String                              ]
+    <OutputFileName>        -> Specifies An Output File Name For The Keras Model, Weights, Architecture And Visual Image Files             [ Type String                              ]
     <PrintNetworkInputs>    -> Prints Raw Network Input/Output Data (Matrices) Prior To Sending To The Network As Input/Expected Output    [ Type Int: 1 = True / 0 = False (Default) ]
     <PrintMatrixStats>      -> Prints Statistics On Network Input/Output Matrix/Sequence Generation                                        [ Type Int: 1 = True / 0 = False (Default) ]
     <AdjustVectors>         -> Optimizes CUI/Predicate Vectors, Removing Vector Data Not In Training File And Re-organizes Vector Indices  [ Type Int: 1 = True / 0 = False (Default) ]
     <TrainableDenseWeights> -> Sets CUI/Predicate Dense Weights As Trainable                                                               [ Type Int: 1 = True / 0 = False (Default) ]
     <ShuffleInputData>      -> Shuffles Input/Output Data As Entered Into The Network During Training                                      [ Type Int: 1 = True / 0 = False (Default) ]
+    <WeightDumpInterval>    -> Dumps Network Weights Based User Specified Setting                                                          [ Type Int                                 ]
 
     Note: Leaving ConceptVectorFile and PredicateVectorFile as empty string (blank) will enable
           TrainNN to operate in CNDA mode which generates sparse vectors given the training file,
           then trains the network accordingly and similarly to CNDA v0.8 with MCC.
+
+############################################################################
+#                                                                          #
+#    Configuration File Parameters (Detailed)                              #
+#                                                                          #
+############################################################################
+
+    AdjustVectors           -> Optimizes CUI/Predicate Vectors, Removing Vector Data Not In Training File And Re-organizes Vector Indices
+    
+      This parameter optimizes user-specified vector data based on the training file. Vectors not present within the training file data are removed
+      from the vector specified unique cui and predicate data lists. Hard-Coded vector index:value data is re-mapped based on data present in the
+      training dataset. This optimizes generation of the network matrices/sequences as input-output and reduces network training time complexity
+      by reducing the size of the matrices/sequences and total number of elements per vector/number of vectors of each input-output matrix/sequence.
+      Sparse, association style sparse and dense vectors are supported.
+      
+      Example Console Output During Vector Adjustment:
+        AdjustVectorIndexData() - Vector Adjustment Enabled
+        AdjustVectorIndexData() - Gathering All Unique Vectors From Training File
+        AdjustVectorIndexData() - Found 8 Unique CUIs
+        AdjustVectorIndexData() - Found 2 Unique Predicates
+        AdjustVectorIndexData() - Matching Training Data Unique CUIs/Predicates To Unique Vector CUI/Predicate Data
+        AdjustVectorIndexData() -   Original Total Unique CUIs             : 10
+        AdjustVectorIndexData() -   Original Total Unique Predicates       : 3
+        AdjustVectorIndexData() -   New Adjusted Total Unique CUIs         : 8
+        AdjustVectorIndexData() -   New Adjusted Total Unique Predicates   : 2
+        AdjustVectorIndexData() - Adjusting CUI Sparse Vectors
+        AdjustVectorIndexData() -   Original CUI Embedding Matrix Number Of Elements    : 11
+        AdjustVectorIndexData() -   New Adjusted CUI Embedding Matrix Number Of Elements: 9
+        AdjustVectorIndexData() - Adjusting Predicate Sparse Vectors
+        AdjustVectorIndexData() -   Original Predicate Embedding Matrix Number Of Elements    : 4
+        AdjustVectorIndexData() -   New Adjusted Predicate Embedding Matrix Number Of Elements: 3
+        AdjustVectorIndexData() - Adjusting Unique CUI/Predicate Indices
+        AdjustVectorIndexData() - Setting Number Of CUIs And Number Of Predicates Variables To Newly Adjusted Values
+        AdjustVectorIndexData() - Adjusting CUI Indices
+        AdjustVectorIndexData() -   CUI: C001, Old Index: 1, New Index: 1
+        AdjustVectorIndexData() -   CUI: C002, Old Index: 2, New Index: 2
+        AdjustVectorIndexData() -   CUI: C004, Old Index: 4, New Index: 3
+        AdjustVectorIndexData() -   CUI: C005, Old Index: 5, New Index: 4
+        AdjustVectorIndexData() -   CUI: C006, Old Index: 6, New Index: 5
+        AdjustVectorIndexData() -   CUI: C007, Old Index: 7, New Index: 6
+        AdjustVectorIndexData() -   CUI: C009, Old Index: 9, New Index: 7
+        AdjustVectorIndexData() -   CUI: C010, Old Index: 10, New Index: 8
+        AdjustVectorIndexData() - Setting "found_cuis" to "unique_cui_data"
+        AdjustVectorIndexData() - Adjusting CUI Sparse Hard-Coded Vector Indices
+        AdjustVectorIndexData() - Adjusting Predicate Indices
+        AdjustVectorIndexData() -   Predicate: AFFECTS, Old Index: 1, New Index: 1
+        AdjustVectorIndexData() -   Predicate: TREATS, Old Index: 3, New Index: 2
+        AdjustVectorIndexData() - Setting "found_predicates" to "unique_predicate_data"
+        AdjustVectorIndexData() - Adjusting Predicate Sparse Hard-Coded Vector Indices
+        AdjustVectorIndexData() - Complete
+        
+      Note: This is not supported with using a vector file containing cuis and predicates using a predicate list. The script will
+            display an error message and proceed without vector adjustment/optimization.
+    
+
+    <OutputFileName>        -> Specifies An Output File Name For The Keras Model, Weights, Architecture And Visual Image Files
+    
+      Ex: <OutputFileName> = "cui_mini"
+          Network Output File Names:
+              - cui_mini_sparse_model.h5
+              - cui_mini_sparse_model_weights.h5
+              - cui_mini_sparse_model_architecture.json
+              - cui_mini_sparse_model_visual.png
+      
+      Not specifiying this variable will default to "trained_nn".
+      
+      ie. Network Output Files Names:
+              - trained_nn_model.h5
+              - trained_nn_model_weights.h5
+              - trained_nn_model_architecture.json
+              - trained_nn_model_visual.png
+    
+    
+    <WeightDumpInterval>    -> Dumps Network Weights Based User Specified Setting
+    
+      This will dump network weights based on multiples of the specified value. A counter increments per epoch and when it exceeds the user specified
+      value the script will dump that current epoch's weights.
+      
+      Ex. <WeightDumpInterval> = 2, will dump network weights every two epochs until training is completed.
+      
+      Dumped weights will be named based on the current epoch and output file name variables.
+      
+      Ex. <OutputFileName> = "cui_mini" and the current epoch is 2, the file name of the dumped weights will be:
+          "cui_mini_epoch_2_model_weights.h5"
+          
+    <EvaluateFile>          -> Evaluation File (Must Be In Same Format As <TrainFile>)
+    
+      Network metric output is based on a batch-by-batch basis by default. Setting this parameter to a evaluation file will load that evaluation
+      data into memory and generate evaluation cui input, predicate input and cui output matrices for the evaluation file using the specified
+      cui and predicate vector files (if any are specified). When a training statistics file path is also specified with this parameter, network
+      metrics will be computed per epoch against the evaluation dataset and saved to the training statistics file.
+      
+      Ex: <EvaluateFile> = "cui_mini_eval" and <TrainingStatsFile> = "training_stats_file.txt". Contents of the training stats file can be seen in
+          the form:
+              Epoch	Loss	Accuracy	Precision	Recall	Matthews_Correlation
+              0	0.8800889849662781	0.10000000149011612	0.145454540848732	0.42105263471603394	-0.12553337216377258
+              1	0.879913330078125	0.10000000149011612	0.14814814925193787	0.42105263471603394	-0.11558815091848373
+              2	0.8796602487564087	0.10000000149011612	0.1538461595773697	0.42105263471603394	-0.09592156112194061
+              3	0.8793387413024902	0.10000000149011612	0.14000000059604645	0.3684210479259491	-0.12745319306850433
+              4	0.8789545893669128	0.10000000149011612	0.1458333283662796	0.3684210479259491	-0.10816686600446701
+              5	0.8785156011581421	0.10000000149011612	0.15217390656471252	0.3684210479259491	-0.0889926478266716
+              6	0.8780261874198914	0.10000000149011612	0.1666666716337204	0.3684210479259491	-0.050613705068826675
+              7	0.8774930834770203	0.10000000149011612	0.17499999701976776	0.3684210479259491	-0.031219525262713432
+              8	0.8769217729568481	0.10000000149011612	0.18918919563293457	0.3684210479259491	-0.0015839111292734742
+              9	0.8763140439987183	0.10000000149011612	0.21212121844291687	0.3684210479259491	0.03957393020391464
+              10	0.8756741285324097	0.10000000149011612	0.22580644488334656	0.3684210479259491	0.06117841973900795
+      
+      Note: Generating statistics based on the evaluation file depends on specifying <TrainingStatsFile> and <EvaluateFile> Parameters. If both of
+            these are not specified, the network will continue to calculate statistics based on a batch-by-batch basis, not displaying representative
+            data based on the entire dataset.
+            
+      Data Generated Batch-By-Batch Will Be Displayed As Shown Below (Note how the two are named/categorized differently):
+              epoch	Matthews_Correlation	Precision	Recall	acc	loss
+              0	0.07128726691007614	0.25999999046325684	0.5652173757553101	0.10000000149011612	0.8585349321365356
+              1	0.023762421682476997	0.23999999463558197	0.52173912525177	0.10000000149011612	0.860185444355011
+              2	-0.07881104201078415	0.20000000298023224	0.47826087474823	0.10000000149011612	0.8608811497688293
+              3	-0.03470007702708244	0.21568627655506134	0.47826087474823	0.0	0.8594555854797363
+              4	0.08223442733287811	0.26530611515045166	0.5652173757553101	0.20000000298023224	0.8581691980361938
+              5	-0.0276530422270298	0.21739129722118378	0.43478259444236755	0.0	0.8597105145454407
+              6	-0.0019025164656341076	0.2291666716337204	0.47826087474823	0.0	0.8597526550292969
+              7	-0.005744492169469595	0.22727273404598236	0.43478259444236755	0.30000001192092896	0.8575164079666138
+              8	0.12416692078113556	0.2926829159259796	0.52173912525177	0.20000000298023224	0.8560946583747864
+              9	0.016369333490729332	0.2380952388048172	0.43478259444236755	0.20000000298023224	0.8569968938827515
+              10	0.1346537321805954	0.3055555522441864	0.47826087474823	0.10000000149011612	0.8561884164810181
+      
+      
 
 ############################################################################
 #                                                                          #
@@ -180,155 +309,155 @@
     <TestInputPredicate>    -> Predicate Input To Test In Trained Network 
     <TestOutputCUI>         -> CUI Output To Test In Trained Network
     
-    Using these three parameters, the script will attempt to forward propagate the inputs versus
-    the expected network output and evaluate the given results, printing network metrics to the screen.
-    The script will also print the network's predictions to the screen as shown below:
-    
-    Example Console Output:
-        ProcessNeuralNetwork() - Evaluating Model
-        ProcessNeuralNetwork() - Evaluating Inputs - CUI: "C001" and Predicate: "ISA" Versus Output CUI: "C003"
-        ProcessNeuralNetwork() - Loss: 0.4185728132724762 - Accuracy: 0.8999999761581421 - Precision: 0.0 - Matthews Correlation: 0.0
-        ProcessNeuralNetwork() - Predicting Output Given Inputs -> CUI: "C001" and Predicate: "ISA"
-        ProcessNeuralNetwork() - Predicted CUI Indices: [[0.29122147 0.3247243  0.40073794 0.38012606 0.25465256 0.24141827
-          0.27007547 0.32670346 0.30688864 0.33571053]]
+      Using these three parameters, the script will attempt to forward propagate the inputs versus
+      the expected network output and evaluate the given results, printing network metrics to the screen.
+      The script will also print the network's predictions to the screen as shown below:
+      
+      Example Console Output:
+          ProcessNeuralNetwork() - Evaluating Model
+          ProcessNeuralNetwork() - Evaluating Inputs - CUI: "C001" and Predicate: "ISA" Versus Output CUI: "C003"
+          ProcessNeuralNetwork() - Loss: 0.4185728132724762 - Accuracy: 0.8999999761581421 - Precision: 0.0 - Matthews Correlation: 0.0
+          ProcessNeuralNetwork() - Predicting Output Given Inputs -> CUI: "C001" and Predicate: "ISA"
+          ProcessNeuralNetwork() - Predicted CUI Indices: [[0.29122147 0.3247243  0.40073794 0.38012606 0.25465256 0.24141827
+            0.27007547 0.32670346 0.30688864 0.33571053]]
     
     
     <TrainingStatsFile>     -> File To Print Training Statistics To After Each Epoch
     
-    This parameter can be specified as any string/filename. It will print calculated neural network
-    metrics after each epoch. An example can be seen below:
-    
-    Example File Output:
-        epoch	Matthews_Correlation	Precision	Recall	acc	loss
-        0	0.10790298134088516	0.27450981736183167	0.6086956262588501	0.5400000214576721	0.6931508779525757
-        1	0.09702833741903305	0.26923078298568726	0.6086956262588501	0.5300000309944153	0.6928690671920776
-        2	0.03856460377573967	0.24528302252292633	0.5652173757553101	0.5	0.6959676742553711
-        3	...
-        n   0.2028554230928421	0.37037035822868347	0.43478259444236755	0.699999988079071	0.6662446856498718
+      This parameter can be specified as any string/filename. It will print calculated neural network
+      metrics after each epoch. An example can be seen below:
+      
+      Example File Output:
+          epoch	Matthews_Correlation	Precision	Recall	acc	loss
+          0	0.10790298134088516	0.27450981736183167	0.6086956262588501	0.5400000214576721	0.6931508779525757
+          1	0.09702833741903305	0.26923078298568726	0.6086956262588501	0.5300000309944153	0.6928690671920776
+          2	0.03856460377573967	0.24528302252292633	0.5652173757553101	0.5	0.6959676742553711
+          3	...
+          n   0.2028554230928421	0.37037035822868347	0.43478259444236755	0.699999988079071	0.6662446856498718
     
     
     <PrintNetworkInputs>    -> Prints Raw Network Input/Output Data (Matrices) Prior To Sending To The Network As Input/Expected Output
     
-    This parameters will show the matrices/sequences as generated by the script before sending as input/output to the
-    neural network. Example console output is shown below:
-    
-    Example Console Output:
-        GenerateNetworkData() - =========================================================
-        GenerateNetworkData() - =        Printing Compressed Row/Sparse Matrices        =
-        GenerateNetworkData() - =========================================================
-          (0, 0)	1.0
-          (1, 0)	1.0
-          (2, 1)	1.0
-          (3, 1)	1.0
-          (4, 2)	1.0
-          (5, 2)	1.0
-          (6, 2)	1.0
-          (7, 3)	1.0
-          (8, 4)	1.0
-          (9, 4)	1.0
-        GenerateNetworkData() - Original Dense Formatted Sparse Matrix - Subject CUIs
-        [[1. 0. 0. 0. 0. 0. 0. 0. 0. 0.]
-         [1. 0. 0. 0. 0. 0. 0. 0. 0. 0.]
-         [0. 1. 0. 0. 0. 0. 0. 0. 0. 0.]
-         [0. 1. 0. 0. 0. 0. 0. 0. 0. 0.]
-         [0. 0. 1. 0. 0. 0. 0. 0. 0. 0.]
-         [0. 0. 1. 0. 0. 0. 0. 0. 0. 0.]
-         [0. 0. 1. 0. 0. 0. 0. 0. 0. 0.]
-         [0. 0. 0. 1. 0. 0. 0. 0. 0. 0.]
-         [0. 0. 0. 0. 1. 0. 0. 0. 0. 0.]
-         [0. 0. 0. 0. 1. 0. 0. 0. 0. 0.]]
-        GenerateNetworkData() - Compressed Sparse Matrix - Predicates
-          (0, 1)	1.0
-          (1, 0)	1.0
-          (2, 2)	1.0
-          (3, 0)	1.0
-          (4, 2)	1.0
-          (5, 1)	1.0
-          (6, 0)	1.0
-          (7, 1)	1.0
-          (8, 2)	1.0
-          (9, 0)	1.0
-        GenerateNetworkData() - Original Dense Formatted Sparse Matrix - Predicates
-        [[0. 1. 0.]
-         [1. 0. 0.]
-         [0. 0. 1.]
-         [1. 0. 0.]
-         [0. 0. 1.]
-         [0. 1. 0.]
-         [1. 0. 0.]
-         [0. 1. 0.]
-         [0. 0. 1.]
-         [1. 0. 0.]]
-        GenerateNetworkMatrices() - Compressed Sparse Matrix - Object CUIs
-          (0, 2)	1
-          (1, 1)	1
-          (1, 3)	1
-          (1, 8)	1
-          (2, 2)	1
-          (2, 3)	1
-          (2, 6)	1
-          (2, 7)	1
-          (3, 4)	1
-          (3, 5)	1
-          (3, 9)	1
-          (4, 0)	1
-          (4, 4)	1
-          (4, 6)	1
-          (5, 7)	1
-          (6, 1)	1
-          (7, 9)	1
-          (8, 0)	1
-          (8, 8)	1
-          (8, 9)	1
-          (9, 2)	1
-          (9, 3)	1
-          (9, 5)	1
-        GenerateNetworkMatrices() - Original Dense Formatted Sparse Matrix - Object CUIs
-        [[0 0 1 0 0 0 0 0 0 0]
-         [0 1 0 1 0 0 0 0 1 0]
-         [0 0 1 1 0 0 1 1 0 0]
-         [0 0 0 0 1 1 0 0 0 1]
-         [1 0 0 0 1 0 1 0 0 0]
-         [0 0 0 0 0 0 0 1 0 0]
-         [0 1 0 0 0 0 0 0 0 0]
-         [0 0 0 0 0 0 0 0 0 1]
-         [1 0 0 0 0 0 0 0 1 1]
-         [0 0 1 1 0 1 0 0 0 0]]
-        GenerateNetworkData() - =========================================================
-        GenerateNetworkData() - =                                                       =
-        GenerateNetworkData() - =========================================================
+      This parameters will show the matrices/sequences as generated by the script before sending as input/output to the
+      neural network. Example console output is shown below:
+      
+      Example Console Output:
+          GenerateNetworkData() - =========================================================
+          GenerateNetworkData() - =        Printing Compressed Row/Sparse Matrices        =
+          GenerateNetworkData() - =========================================================
+            (0, 0)	1.0
+            (1, 0)	1.0
+            (2, 1)	1.0
+            (3, 1)	1.0
+            (4, 2)	1.0
+            (5, 2)	1.0
+            (6, 2)	1.0
+            (7, 3)	1.0
+            (8, 4)	1.0
+            (9, 4)	1.0
+          GenerateNetworkData() - Original Dense Formatted Sparse Matrix - Subject CUIs
+          [[1. 0. 0. 0. 0. 0. 0. 0. 0. 0.]
+           [1. 0. 0. 0. 0. 0. 0. 0. 0. 0.]
+           [0. 1. 0. 0. 0. 0. 0. 0. 0. 0.]
+           [0. 1. 0. 0. 0. 0. 0. 0. 0. 0.]
+           [0. 0. 1. 0. 0. 0. 0. 0. 0. 0.]
+           [0. 0. 1. 0. 0. 0. 0. 0. 0. 0.]
+           [0. 0. 1. 0. 0. 0. 0. 0. 0. 0.]
+           [0. 0. 0. 1. 0. 0. 0. 0. 0. 0.]
+           [0. 0. 0. 0. 1. 0. 0. 0. 0. 0.]
+           [0. 0. 0. 0. 1. 0. 0. 0. 0. 0.]]
+          GenerateNetworkData() - Compressed Sparse Matrix - Predicates
+            (0, 1)	1.0
+            (1, 0)	1.0
+            (2, 2)	1.0
+            (3, 0)	1.0
+            (4, 2)	1.0
+            (5, 1)	1.0
+            (6, 0)	1.0
+            (7, 1)	1.0
+            (8, 2)	1.0
+            (9, 0)	1.0
+          GenerateNetworkData() - Original Dense Formatted Sparse Matrix - Predicates
+          [[0. 1. 0.]
+           [1. 0. 0.]
+           [0. 0. 1.]
+           [1. 0. 0.]
+           [0. 0. 1.]
+           [0. 1. 0.]
+           [1. 0. 0.]
+           [0. 1. 0.]
+           [0. 0. 1.]
+           [1. 0. 0.]]
+          GenerateNetworkMatrices() - Compressed Sparse Matrix - Object CUIs
+            (0, 2)	1
+            (1, 1)	1
+            (1, 3)	1
+            (1, 8)	1
+            (2, 2)	1
+            (2, 3)	1
+            (2, 6)	1
+            (2, 7)	1
+            (3, 4)	1
+            (3, 5)	1
+            (3, 9)	1
+            (4, 0)	1
+            (4, 4)	1
+            (4, 6)	1
+            (5, 7)	1
+            (6, 1)	1
+            (7, 9)	1
+            (8, 0)	1
+            (8, 8)	1
+            (8, 9)	1
+            (9, 2)	1
+            (9, 3)	1
+            (9, 5)	1
+          GenerateNetworkMatrices() - Original Dense Formatted Sparse Matrix - Object CUIs
+          [[0 0 1 0 0 0 0 0 0 0]
+           [0 1 0 1 0 0 0 0 1 0]
+           [0 0 1 1 0 0 1 1 0 0]
+           [0 0 0 0 1 1 0 0 0 1]
+           [1 0 0 0 1 0 1 0 0 0]
+           [0 0 0 0 0 0 0 1 0 0]
+           [0 1 0 0 0 0 0 0 0 0]
+           [0 0 0 0 0 0 0 0 0 1]
+           [1 0 0 0 0 0 0 0 1 1]
+           [0 0 1 1 0 1 0 0 0 0]]
+          GenerateNetworkData() - =========================================================
+          GenerateNetworkData() - =                                                       =
+          GenerateNetworkData() - =========================================================
     
     
     <PrintMatrixStats>      -> Prints Statistics On Network Input/Output Matrix/Sequence Generation
     
-    This will print statistics on the matrices/sequence arrays used as input/output for the neural network.
-    
-    Example Console Output:
-        GenerateNetworkData() - =========================================================
-        GenerateNetworkData() - =                Matrix Generation Stats                =
-        GenerateNetworkData() - =========================================================
-        GenerateNetworkData() -   Number Of Subject CUI Inputs              : 10
-        GenerateNetworkData() -   Number Of Predicate Inputs                : 10
-        GenerateNetworkData() -   Number Of Object CUI Outputs              : 23
-        GenerateNetworkData() -   Number Of Concept Input Index Elements    : 10
-        GenerateNetworkData() -   Number Of Concept Input Value Elements    : 10
-        GenerateNetworkData() -   Number Of Predicate Input Index Elements  : 10
-        GenerateNetworkData() -   Number Of Predicate Input Value Elements  : 10
-        GenerateNetworkData() -   Number Of Concept Output Index Elements   : 23
-        GenerateNetworkData() -   Number Of Concept Output Value Elements   : 23
-        GenerateNetworkData() -   Number Of Identified CUI Elements         : 10
-        GenerateNetworkData() -   Number Of Identified Predicate Elements   : 3
-        GenerateNetworkData() -   Number Of Unidentified CUI Elements       : 0
-        GenerateNetworkData() -   Number Of Unidentified Predicate Elements : 0
-        GenerateNetworkData() -   Total Unique CUIs                         : 10
-        GenerateNetworkData() -   Total Unique Predicates                   : 3
-        GenerateNetworkData() -   Identified Input Data Array Length        : 500
-        GenerateNetworkData() -   Number Of Skipped Lines In Training Data  : 0
-        GenerateNetworkData() -   Total Input Data Array Length             : 10
-        GenerateNetworkData() - =========================================================
-        GenerateNetworkData() - =                                                       =
-        GenerateNetworkData() - =========================================================
-
+      This will print statistics on the matrices/sequence arrays used as input/output for the neural network.
+      
+      Example Console Output:
+          GenerateNetworkData() - =========================================================
+          GenerateNetworkData() - =                Matrix Generation Stats                =
+          GenerateNetworkData() - =========================================================
+          GenerateNetworkData() -   Number Of Subject CUI Inputs              : 10
+          GenerateNetworkData() -   Number Of Predicate Inputs                : 10
+          GenerateNetworkData() -   Number Of Object CUI Outputs              : 23
+          GenerateNetworkData() -   Number Of Concept Input Index Elements    : 10
+          GenerateNetworkData() -   Number Of Concept Input Value Elements    : 10
+          GenerateNetworkData() -   Number Of Predicate Input Index Elements  : 10
+          GenerateNetworkData() -   Number Of Predicate Input Value Elements  : 10
+          GenerateNetworkData() -   Number Of Concept Output Index Elements   : 23
+          GenerateNetworkData() -   Number Of Concept Output Value Elements   : 23
+          GenerateNetworkData() -   Number Of Identified CUI Elements         : 10
+          GenerateNetworkData() -   Number Of Identified Predicate Elements   : 3
+          GenerateNetworkData() -   Number Of Unidentified CUI Elements       : 0
+          GenerateNetworkData() -   Number Of Unidentified Predicate Elements : 0
+          GenerateNetworkData() -   Total Unique CUIs                         : 10
+          GenerateNetworkData() -   Total Unique Predicates                   : 3
+          GenerateNetworkData() -   Identified Input Data Array Length        : 500
+          GenerateNetworkData() -   Number Of Skipped Lines In Training Data  : 0
+          GenerateNetworkData() -   Total Input Data Array Length             : 10
+          GenerateNetworkData() - =========================================================
+          GenerateNetworkData() - =                                                       =
+          GenerateNetworkData() - =========================================================
+  
     Note: These parameters are used for debugging purposes. While they're amusing to look at during
           runtime, computational time complexity will suffer as a result of using these parameters.
         

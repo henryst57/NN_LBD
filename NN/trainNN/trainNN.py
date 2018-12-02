@@ -5,7 +5,7 @@
 #    -------------------------------------------                                           #
 #                                                                                          #
 #    Date:    10/02/2018                                                                   #
-#    Revised: 11/21/2018                                                                   #
+#    Revised: 12/01/2018                                                                   #
 #                                                                                          #
 #    Generates A Neural Network Using A Configuration File.                                #
 #      - Supports Dense and Sparse Input Vectors In All Combinations Of CUI and            #
@@ -55,7 +55,7 @@ from fractions import gcd
 #    Global Variables / Neural Network Parameters (Default Values)                         #
 #                                                                                          #
 ############################################################################################
-version                         = 0.35
+version                         = 0.36
 number_of_predicates            = 0
 number_of_cuis                  = 0
 layer_1_size                    = 200
@@ -77,9 +77,13 @@ concept_vector_file             = ""
 predicate_vector_file           = ""
 predicate_list_file             = ""
 training_stats_file             = ""
+output_file_name                = ""
+evaluation_file                 = ""
 print_network_inputs            = 0
 print_matrix_generation_stats   = 0
 adjust_for_unidentified_vectors = 0
+weight_dump_interval            = 0
+process_eval_metrics_per_epoch  = 0
 trainable_dense_embeddings      = False
 shuffle_input_data              = False
 cui_dense_input_mode            = False
@@ -97,6 +101,12 @@ unique_predicate_data           = {}
 cui_embedding_matrix            = []
 predicate_embedding_matrix      = []
 
+# Evaluation File Data
+evaluation_data                 = []
+eval_cui_input_matrix           = []
+eval_predicate_input_matrix     = []
+eval_cui_output_matrix          = []
+
 # Stats Variables
 identified_cuis                 = []             # CUIs Found In Unique CUI List During Matrix Generation
 identified_predicates           = []             # Predicates Found In Unique CUI List During Matrix Generation
@@ -109,7 +119,6 @@ write_log                       = 0
 debug_file_name                 = "nnlbd_log.txt"
 debug_log_file                  = None
 
-
 ############################################################################################
 #                                                                                          #
 #    Sub-Routines                                                                          #
@@ -117,8 +126,8 @@ debug_log_file                  = None
 ############################################################################################
 
 #   Print Statements To Console, Debug Log File Or Both
-def PrintLog( print_str ):
-    if( debug_log is 1 ): print( str( print_str ) )
+def PrintLog( print_str, force_print = None ):
+    if( debug_log is 1 or force_print is 1 ): print( str( print_str ) )
     if( write_log is 1 and debug_log_file != None ):
         debug_log_file.write( str( print_str ) + "\n" )
 
@@ -138,6 +147,26 @@ def OpenDebugFileHandle():
 def CloseDebugFileHandle():
     global debug_log_file
     if( write_log is 1 and debug_log_file is not None ): debug_log_file.close
+
+#   Open The Training Statistics File Handle
+def OpenTrainingStatsFileHandle():
+    global training_stats_file
+    PrintLog( "OpenTrainingStatsFileHandle() - Creating and Opening Training Stats File Handle: \"" + training_stats_file + "\"" )
+    training_stats_file = open( training_stats_file, "w" )
+
+#   Write String To Training Statistics File Handle
+def WriteStringToTrainingStatsFile( string ):
+    if( training_stats_file is not "" ):
+        PrintLog( "WriteStringToTrainingStatsFile() - Writing String To File: \"" + string + "\"" )
+        training_stats_file.write( str( string ) + "\n" )
+
+#   Close The Training Statistics File Handle
+def CloseTrainingStatsFileHandle():
+    global training_stats_file
+    if( training_stats_file is not "" ):
+        PrintLog( "CloseTrainingStatsFileHandle() - Closing Training Stats File Handle" )
+        training_stats_file.close()
+        training_stats_file = ""
 
 #   Checks To See If The Input Is In Dense Or Sparse Format
 #       False = Dense Format, True = Sparse Format
@@ -162,9 +191,12 @@ def ReadConfigFile( config_file_path ):
     global learning_rate
     global debug_log_file
     global test_input_cui
+    global debug_file_name
+    global evaluation_file
     global test_output_cui
     global print_key_files
     global number_of_epochs
+    global output_file_name
     global shuffle_input_data
     global concept_output_file
     global concept_vector_file
@@ -173,6 +205,7 @@ def ReadConfigFile( config_file_path ):
     global negative_sample_rate
     global print_network_inputs
     global test_input_predicate
+    global weight_dump_interval
     global predicate_vector_file
     global trainable_dense_embeddings
     global print_matrix_generation_stats
@@ -202,49 +235,66 @@ def ReadConfigFile( config_file_path ):
         line = re.sub( r'<|>|\n', '', line )
         data = line.split( ":" )
 
-        if data[0] == "DebugLog"              : debug_log                       = int( data[1] )
-        if data[0] == "WriteLog"              : write_log                       = int( data[1] )
-        if data[0] == "Momentum"              : momentum                        = float( data[1] )
-        if data[0] == "BatchSize"             : batch_size                      = int( data[1] )
-        if data[0] == "DropoutAMT"            : dropout_amt                     = float( data[1] )
-        if data[0] == "Layer1Size"            : layer_1_size                    = int( data[1] )
-        if data[0] == "Layer2Size"            : layer_2_size                    = int( data[1] )
-        if data[0] == "LearningRate"          : learning_rate                   = float( data[1] )
-        if data[0] == "TestInputCUI"          : test_input_cui                  = str( data[1] )
-        if data[0] == "TestInputPredicate"    : test_input_predicate            = str( data[1] )
-        if data[0] == "TestOutputCUI"         : test_output_cui                 = str( data[1] )
-        if data[0] == "NumberOfSteps"         : steps                           = int( data[1] )
-        if data[0] == "NumberOfEpochs"        : number_of_epochs                = int( data[1] )
-        if data[0] == "TrainFile"             : train_file                      = str( data[1] )
-        if data[0] == "NegativeSampleRate"    : negative_sample_rate            = int( data[1] )
-        if data[0] == "PrintKeyFiles"         : print_key_files                 = int( data[1] )
-        if data[0] == "ConceptVectorFile"     : concept_vector_file             = str( data[1] )
-        if data[0] == "PredicateVectorFile"   : predicate_vector_file           = str( data[1] )
-        if data[0] == "PredicateListFile"     : predicate_list_file             = str( data[1] )
-        if data[0] == "TrainingStatsFile"     : training_stats_file             = str( data[1] )
-        if data[0] == "PrintNetworkInputs"    : print_network_inputs            = int( data[1] )
-        if data[0] == "PrintMatrixStats"      : print_matrix_generation_stats   = int( data[1] )
-        if data[0] == "AdjustVectors"         : adjust_for_unidentified_vectors = int( data[1] )
-        if data[0] == "TrainableDenseWeights" : trainable_dense_embeddings      = int( data[1] )
-        if data[0] == "ShuffleInputData"      : shuffle_input_data              = int( data[1] )
+        if data[0] == "DebugLog"                : debug_log                       = int( data[1] )
+        if data[0] == "WriteLog"                : write_log                       = int( data[1] )
+        if data[0] == "Momentum"                : momentum                        = float( data[1] )
+        if data[0] == "BatchSize"               : batch_size                      = int( data[1] )
+        if data[0] == "DropoutAMT"              : dropout_amt                     = float( data[1] )
+        if data[0] == "Layer1Size"              : layer_1_size                    = int( data[1] )
+        if data[0] == "Layer2Size"              : layer_2_size                    = int( data[1] )
+        if data[0] == "LearningRate"            : learning_rate                   = float( data[1] )
+        if data[0] == "TestInputCUI"            : test_input_cui                  = str( data[1] )
+        if data[0] == "TestInputPredicate"      : test_input_predicate            = str( data[1] )
+        if data[0] == "TestOutputCUI"           : test_output_cui                 = str( data[1] )
+        if data[0] == "NumberOfSteps"           : steps                           = int( data[1] )
+        if data[0] == "NumberOfEpochs"          : number_of_epochs                = int( data[1] )
+        if data[0] == "TrainFile"               : train_file                      = str( data[1] )
+        if data[0] == "NegativeSampleRate"      : negative_sample_rate            = int( data[1] )
+        if data[0] == "PrintKeyFiles"           : print_key_files                 = int( data[1] )
+        if data[0] == "ConceptVectorFile"       : concept_vector_file             = str( data[1] )
+        if data[0] == "PredicateVectorFile"     : predicate_vector_file           = str( data[1] )
+        if data[0] == "PredicateListFile"       : predicate_list_file             = str( data[1] )
+        if data[0] == "TrainingStatsFile"       : training_stats_file             = str( data[1] )
+        if data[0] == "PrintNetworkInputs"      : print_network_inputs            = int( data[1] )
+        if data[0] == "PrintMatrixStats"        : print_matrix_generation_stats   = int( data[1] )
+        if data[0] == "AdjustVectors"           : adjust_for_unidentified_vectors = int( data[1] )
+        if data[0] == "TrainableDenseWeights"   : trainable_dense_embeddings      = int( data[1] )
+        if data[0] == "ShuffleInputData"        : shuffle_input_data              = int( data[1] )
+        if data[0] == "OutputFileName"          : output_file_name                = str( data[1] )
+        if data[0] == "WeightDumpInterval"      : weight_dump_interval            = int( data[1] )
+        if data[0] == "EvaluateFile"            : evaluation_file                 = str( data[1] )
 
     f.close()
+    
+    # Set Debug Log File Name To Match Output File Name
+    if( write_log != 0 and output_file_name is not "" ):
+        debug_file_name = output_file_name + "_" + debug_file_name
+        PrintLog( "ReadConfigFile() - Setting Debug Log File Name: \"" + debug_file_name + "\"" )
 
     OpenDebugFileHandle()
 
     # Check(s)
     if( train_file is "" ):
-        PrintLog( "ReadConfigFile() - Error: \"TrainFile\" Not Specified" )
+        PrintLog( "ReadConfigFile() - Error: \"TrainFile\" Not Specified", 1 )
     if( CheckIfFileExists( train_file ) is False ):
-        PrintLog( "ReadConfigFile() - Error: \"" + str( train_file ) + "\" Does Not Exist" )
+        PrintLog( "ReadConfigFile() - Error: \"" + str( train_file ) + "\" Does Not Exist", 1 )
         exit()
     if( batch_size is 0 ):
-        PrintLog( "ReadConfigFile() - Error: Batch_Size Variable Cannot Be <= \"0\" / Exiting Program" )
+        PrintLog( "ReadConfigFile() - Error: Batch_Size Variable Cannot Be <= \"0\" / Exiting Program", 1 )
         exit()
     if( concept_vector_file != "" and concept_vector_file == predicate_vector_file and ( predicate_list_file is "" or predicate_list_file is None ) ):
-        PrintLog( "ReadConfigFile() - Error: When \"ConceptVectorFile\" == \"PredicateVectorFile\"" )
-        PrintLog( "ReadConfigFile() -        A Valid Predicate List Must Be Specified" )
+        PrintLog( "ReadConfigFile() - Error: When \"ConceptVectorFile\" == \"PredicateVectorFile\"", 1 )
+        PrintLog( "ReadConfigFile() -        A Valid Predicate List Must Be Specified", 1 )
         exit()
+    if( output_file_name is "" ):
+        PrintLog( "ReadConfigFile() - Warning: Output File Name Is Empty / Setting To \"trained_nn\"", 1 )
+        output_file_name = "trained_nn"
+    if( weight_dump_interval >= number_of_epochs ):
+        PrintLog( "ReadConfigFile() - Warning: Weight Dump Interval Parameter >= Number Of Epochs / Setting Weight Dump Interval = 0", 1 )
+        weight_dump_interval = 0
+    if( evaluation_file is "" ):
+        PrintLog( "ReadConfigFile() - Warning: Evaluation File Is Not Specified / Training Metrics Will Be Calulated On A Batch-By-Batch Basis", 1 )
+    
 
     if( trainable_dense_embeddings is 1 ): trainable_dense_embeddings = True
     else:                                  trainable_dense_embeddings = False
@@ -267,29 +317,32 @@ def ReadConfigFile( config_file_path ):
     PrintLog( "-   Configuration File Settings                         -" )
     PrintLog( "=========================================================" )
 
-    PrintLog( "    Train File              : " + str( train_file ) )
-    PrintLog( "    Concept Vector File     : " + str( concept_vector_file ) )
-    PrintLog( "    Predicate Vector File   : " + str( predicate_vector_file ) )
-    PrintLog( "    Predicate List File     : " + str( predicate_list_file ) )
-    PrintLog( "    Training Stats File     : " + str( training_stats_file ) )
-    PrintLog( "    Batch Size              : " + str( batch_size ) )
-    PrintLog( "    Learning Rate           : " + str( learning_rate ) )
-    PrintLog( "    Number Of Epochs        : " + str( number_of_epochs ) )
-    PrintLog( "    Number Of Steps         : " + str( steps ) )
-    PrintLog( "    Momentum                : " + str( momentum ) )
-    PrintLog( "    Dropout AMT             : " + str( dropout_amt ) )
-    PrintLog( "    Layer 1 Size            : " + str( layer_1_size ) )
-    PrintLog( "    Layer 2 Size            : " + str( layer_2_size ) )
-    PrintLog( "    Negative Sample Rate    : " + str( negative_sample_rate ) )
-    PrintLog( "    Print Key Files         : " + str( print_key_files ) )
-    PrintLog( "    Print Network Inputs    : " + str( print_network_inputs ) )
-    PrintLog( "    Print Matrix Stats      : " + str( print_matrix_generation_stats ) )
-    PrintLog( "    Test Input CUI          : " + str( test_input_cui ) )
-    PrintLog( "    Test Input Predicate    : " + str( test_input_predicate ) )
-    PrintLog( "    Test Output CUI         : " + str( test_output_cui ) )
-    PrintLog( "    Adjust Vectors          : " + str( adjust_for_unidentified_vectors ) )
-    PrintLog( "    Trainable Dense Weights : " + str( trainable_dense_embeddings ) )
-    PrintLog( "    Shuffle Input Data      : " + str( shuffle_input_data ) )
+    PrintLog( "    Train File                 : " + str( train_file ) )
+    PrintLog( "    Concept Vector File        : " + str( concept_vector_file ) )
+    PrintLog( "    Predicate Vector File      : " + str( predicate_vector_file ) )
+    PrintLog( "    Predicate List File        : " + str( predicate_list_file ) )
+    PrintLog( "    Training Stats File        : " + str( training_stats_file ) )
+    PrintLog( "    Evaluation File            : " + str( evaluation_file ) )
+    PrintLog( "    Output File Name           : " + str( output_file_name ) )
+    PrintLog( "    Batch Size                 : " + str( batch_size ) )
+    PrintLog( "    Learning Rate              : " + str( learning_rate ) )
+    PrintLog( "    Number Of Epochs           : " + str( number_of_epochs ) )
+    PrintLog( "    Number Of Steps            : " + str( steps ) )
+    PrintLog( "    Momentum                   : " + str( momentum ) )
+    PrintLog( "    Dropout AMT                : " + str( dropout_amt ) )
+    PrintLog( "    Layer 1 Size               : " + str( layer_1_size ) )
+    PrintLog( "    Layer 2 Size               : " + str( layer_2_size ) )
+    PrintLog( "    Negative Sample Rate       : " + str( negative_sample_rate ) )
+    PrintLog( "    Print Key Files            : " + str( print_key_files ) )
+    PrintLog( "    Print Network Inputs       : " + str( print_network_inputs ) )
+    PrintLog( "    Print Matrix Stats         : " + str( print_matrix_generation_stats ) )
+    PrintLog( "    Test Input CUI             : " + str( test_input_cui ) )
+    PrintLog( "    Test Input Predicate       : " + str( test_input_predicate ) )
+    PrintLog( "    Test Output CUI            : " + str( test_output_cui ) )
+    PrintLog( "    Adjust Vectors             : " + str( adjust_for_unidentified_vectors ) )
+    PrintLog( "    Trainable Dense Weights    : " + str( trainable_dense_embeddings ) )
+    PrintLog( "    Shuffle Input Data         : " + str( shuffle_input_data ) )
+    PrintLog( "    Weight Dump Interval       : " + str( weight_dump_interval ) )
 
     PrintLog( "=========================================================" )
     PrintLog( "-                                                       -" )
@@ -313,12 +366,12 @@ def LoadVectorFile( vector_file_path, is_cui_vectors ):
 
     # Check(s)
     if( vector_file_path is None or vector_file_path is "" ):
-        if( is_cui_vectors is True ):  PrintLog( "LoadVectorFile() - Warning: No CUI Vector File Specified" )
-        if( is_cui_vectors is False ): PrintLog( "LoadVectorFile() - Warning: No Predicate Vector File Specified" )
+        if( is_cui_vectors is True ):  PrintLog( "LoadVectorFile() - Warning: No CUI Vector File Specified", 1 )
+        if( is_cui_vectors is False ): PrintLog( "LoadVectorFile() - Warning: No Predicate Vector File Specified", 1 )
         return -1
 
     if( CheckIfFileExists( vector_file_path ) is False ):
-        PrintLog( "LoadVectorFile() - Error: Specified File \"" + str( vector_file_path ) + "\" Does Not Exist" )
+        PrintLog( "LoadVectorFile() - Error: Specified File \"" + str( vector_file_path ) + "\" Does Not Exist", 1 )
         return -1
 
     PrintLog( "LoadVectorFile() - Loading Vector File: \"" + vector_file_path +   "\"" )
@@ -329,14 +382,14 @@ def LoadVectorFile( vector_file_path, is_cui_vectors ):
             vector_data = in_file.readlines()
             vector_data.sort()
     except FileNotFoundError:
-        PrintLog( "LoadVectorFile() - Error: Unable To Open File \"" + str( vector_file_path ) + "\"" )
+        PrintLog( "LoadVectorFile() - Error: Unable To Open File \"" + str( vector_file_path ) + "\"", 1 )
         return -1
     finally:
         in_file.close()
 
     # Check(s)
     if( vector_data is None ):
-        PrintLog( "LoadVectorFile() - Error: Failed To Load Vector Data" )
+        PrintLog( "LoadVectorFile() - Error: Failed To Load Vector Data", 1 )
         return -1
     else:
         PrintLog( "LoadVectorFile() - Loaded " + str( len( vector_data ) ) + " Vector Elements" )
@@ -483,19 +536,19 @@ def LoadVectorFileUsingPredicateList( vector_file_path, predicate_list_path ):
 
     # Check(s)
     if( vector_file_path is None or vector_file_path is "" ):
-        PrintLog( "LoadVectorFileUsingPredicateList() - Error: No Vector File Specified" )
+        PrintLog( "LoadVectorFileUsingPredicateList() - Error: No Vector File Specified", 1 )
         return -1
 
     if CheckIfFileExists( vector_file_path ) is False:
-        PrintLog( "LoadVectorFileUsingPredicateList() - Error: Specified File \"" + str( vector_file_path ) + "\" Does Not Exist" )
+        PrintLog( "LoadVectorFileUsingPredicateList() - Error: Specified File \"" + str( vector_file_path ) + "\" Does Not Exist", 1 )
         return -1
 
     if( predicate_list_path is None or predicate_list_path is "" ):
-        PrintLog( "LoadVectorFileUsingPredicateList() - Warning: No Predicate List File Specified" )
+        PrintLog( "LoadVectorFileUsingPredicateList() - Warning: No Predicate List File Specified", 1 )
         return -1
 
     if CheckIfFileExists( predicate_list_path ) is False:
-        PrintLog( "LoadVectorFileUsingPredicateList() - Error: Specified File \"" + str( predicate_list_path ) + "\" Does Not Exist" )
+        PrintLog( "LoadVectorFileUsingPredicateList() - Error: Specified File \"" + str( predicate_list_path ) + "\" Does Not Exist", 1 )
         return -1
 
     PrintLog( "LoadVectorFileUsingPredicateList() - Loading Predicate List: \"" + predicate_list_path + "\"" )
@@ -512,14 +565,14 @@ def LoadVectorFileUsingPredicateList( vector_file_path, predicate_list_path ):
                 for predicate in predicate_data:
                     predicate_list.append( predicate.strip() )
         except FileNotFoundError:
-            PrintLog( "LoadVectorFileUsingPredicateList() - Error: Unable To Open File \"" + str( predicate_list_file ) + "\"" )
+            PrintLog( "LoadVectorFileUsingPredicateList() - Error: Unable To Open File \"" + str( predicate_list_file ) + "\"", 1 )
             return -1
         finally:
             in_file.close()
 
     # Check(s)
     if( predicate_list is None ):
-        PrintLog( "LoadVectorFileUsingPredicateList() - Error: Failed To Predicate List Data" )
+        PrintLog( "LoadVectorFileUsingPredicateList() - Error: Failed To Predicate List Data", 1 )
         return -1
     else:
         PrintLog( "LoadVectorFileUsingPredicateList() - Loaded " + str( len( predicate_list ) ) + " Predicate List Elements" )
@@ -532,14 +585,14 @@ def LoadVectorFileUsingPredicateList( vector_file_path, predicate_list_path ):
         with open( vector_file_path, "r" ) as in_file:
             vector_data = in_file.readlines()
     except FileNotFoundError:
-        PrintLog( "LoadVectorFileUsingPredicateList() - Error: Unable To Open File \"" + str( vector_file_path ) + "\"" )
+        PrintLog( "LoadVectorFileUsingPredicateList() - Error: Unable To Open File \"" + str( vector_file_path ) + "\"", 1 )
         return -1
     finally:
         in_file.close()
 
     # Check(s)
     if( vector_data is None ):
-        PrintLog( "LoadVectorFileUsingPredicateList() - Error: Failed To Load Vector Data" )
+        PrintLog( "LoadVectorFileUsingPredicateList() - Error: Failed To Load Vector Data", 1 )
         return -1
     else:
         PrintLog( "LoadVectorFileUsingPredicateList() - Loaded " + str( len( vector_data ) ) + " Vector Elements" )
@@ -550,9 +603,9 @@ def LoadVectorFileUsingPredicateList( vector_file_path, predicate_list_path ):
         predicate_dense_input_mode = cui_dense_input_mode
         if( cui_dense_input_mode == True ):  PrintLog( "LoadVectorFileUsingPredicateList() - Detected Dense CUI/Predicate Vector Format" )
         if( cui_dense_input_mode == False ):
-            PrintLog( "LoadVectorFileUsingPredicateList() - Detected Sparse CUI/Predicate Vector Format"                )
-            PrintLog( "LoadVectorFileUsingPredicateList() - Error: Sparse CUI/Predicate Vector Format Not Supported"    )
-            PrintLog( "                                            Please Use Separate CUI/Predicate Vectors In Config" )
+            PrintLog( "LoadVectorFileUsingPredicateList() - Detected Sparse CUI/Predicate Vector Format"               , 1 )
+            PrintLog( "LoadVectorFileUsingPredicateList() - Error: Sparse CUI/Predicate Vector Format Not Supported"   , 1 )
+            PrintLog( "                                            Please Use Separate CUI/Predicate Vectors In Config", 1 )
             return -1
 
     loaded_cui_elements       = 1
@@ -686,10 +739,10 @@ def LoadVectorFileUsingPredicateList( vector_file_path, predicate_list_path ):
 
     # Check(s)
     if( number_of_cuis == 0 ):
-        PrintLog( "LoadVectorFileUsingPredicateList() - Error: No CUIs Loaded" )
+        PrintLog( "LoadVectorFileUsingPredicateList() - Error: No CUIs Loaded", 1 )
         return -1
     if( number_of_predicates == 0 ):
-        PrintLog( "LoadVectorFileUsingPredicateList() - Error: No Predicates Loaded" )
+        PrintLog( "LoadVectorFileUsingPredicateList() - Error: No Predicates Loaded", 1 )
         return -1
 
     PrintLog( "LoadVectorFileUsingPredicateList() - Loaded " + str( loaded_cui_elements ) + " CUI Elements" )
@@ -720,7 +773,7 @@ def AdjustVectorIndexData():
         return 0
 
     if( len( training_data ) == 0 ):
-        PrintLog( "AdjustVectorIndexData() - Error: No Training Data Loaded In Memory" )
+        PrintLog( "AdjustVectorIndexData() - Error: No Training Data Loaded In Memory", 1 )
         return -1
 
     # Variables
@@ -923,27 +976,30 @@ def AdjustVectorIndexData():
 def GetConceptUniqueIdentifierData():
     global training_data
     global number_of_cuis
+    global evaluation_data
     global unique_cui_data
     global number_of_predicates
     global unique_predicate_data
     global train_file_data_length
+    global process_eval_metrics_per_epoch
 
+    # Load Training File
     if CheckIfFileExists( train_file ) == False:
-        PrintLog( "GetConceptUniqueIdentifierData() - Error: CUI Data File \"" + str( train_file ) + "\" Does Not Exist" )
+        PrintLog( "GetConceptUniqueIdentifierData() - Error: Training Data File \"" + str( train_file ) + "\" Does Not Exist", 1 )
         return -1;
 
     # Read Concept Unique Identifier-Predicate Occurrence Data From File
-    PrintLog( "GetConceptUniqueIdentifierData() - Reading Concept Input File: \"" + str( train_file ) + "\"" )
+    PrintLog( "GetConceptUniqueIdentifierData() - Reading Training Data File: \"" + str( train_file ) + "\"" )
     try:
         with open( train_file, "r" ) as in_file:
             training_data = in_file.readlines()
     except FileNotFoundError:
-        PrintLog( "GetConceptUniqueIdentifierData() - Error: Unable To Open File \"" + str( train_file )+ "\"" )
+        PrintLog( "GetConceptUniqueIdentifierData() - Error: Unable To Open Training Data File \"" + str( train_file )+ "\"", 1 )
         return -1
     finally:
         in_file.close()
 
-    PrintLog( "GetConceptUniqueIdentifierData() - File Data In Memory" )
+    PrintLog( "GetConceptUniqueIdentifierData() - Training File Data In Memory" )
 
     training_data = [ line.strip() for line in training_data ]    # Removes Trailing Space Characters From CUI Data Strings
     training_data.sort()
@@ -951,6 +1007,42 @@ def GetConceptUniqueIdentifierData():
     train_file_data_length = len( training_data )
     
     PrintLog( "GetConceptUniqueIdentifierData() - Training File Data Length: " + str( train_file_data_length ) )
+    
+    # Load Evaluation File
+    if( evaluation_file is not "" ):
+        if CheckIfFileExists( evaluation_file ) == False:
+            PrintLog( "GetConceptUniqueIdentifierData() - Error: Evaluation File \"" + str( evaluation_file ) + "\" Does Not Exist", 1 )
+            return -1;
+    
+        # Read Concept Unique Identifier-Predicate Occurrence Data From File
+        PrintLog( "GetConceptUniqueIdentifierData() - Reading Evaluation File: \"" + str( evaluation_file ) + "\"" )
+        try:
+            with open( evaluation_file, "r" ) as in_file:
+                evaluation_data = in_file.readlines()
+        except FileNotFoundError:
+            PrintLog( "GetConceptUniqueIdentifierData() - Error: Unable To Open Evaluation File \"" + str( evaluation_file )+ "\"", 1 )
+            return -1
+        finally:
+            in_file.close()
+    
+        PrintLog( "GetConceptUniqueIdentifierData() - Evaluation File Data In Memory" )
+    
+        evaluation_data = [ line.strip() for line in evaluation_data ]    # Removes Trailing Space Characters From CUI Data Strings
+        evaluation_data.sort()
+        
+        PrintLog( "GetConceptUniqueIdentifierData() - Evaluation File Data Length: " + str( len( evaluation_data ) ) )
+        
+        if( len( evaluation_data ) == 0 or training_stats_file == "" ):
+            PrintLog( "GetConceptUniqueIdentifierData() - Warning: Evaluation File Could Not Be Loaded Or Training Statistics File Is Empty String", 1 )
+            PrintLog( "GetConceptUniqueIdentifierData() -          Training Statistics/Metrics Will Print Based On Current Batch" )
+            process_eval_metrics_per_epoch = 0
+        else:
+            process_eval_metrics_per_epoch = 1
+            
+    else:
+        PrintLog( "GetConceptUniqueIdentifierData() - Warning: No Evaluation File Specified" )
+        process_eval_metrics_per_epoch = 0
+    
 
     cui_data_loaded       = False
     predicate_data_loaded = False
@@ -1049,14 +1141,19 @@ def GetConceptUniqueIdentifierData():
 #   Print CUI and Predicate Key Files
 def PrintKeyFiles():
     if( print_key_files is 1 ):
+        # Get Train File Name From Path
+        output_name = train_file.split( "/" )
+        if( len( output_name ) == 1 ): output_name = train_file.split( "\\" )
+        output_name = output_name[-1]
+        
         PrintLog( "PrintKeyFiles() - Key File Printing Enabled" )
-        PrintLog( "PrintKeyFiles() - Printing CUI Key File: " + train_file + ".cui_key" )
+        PrintLog( "PrintKeyFiles() - Printing CUI Key File: " + output_name + ".cui_key" )
 
         cui_keys       = sorted( unique_cui_data.keys() )
         predicate_keys = sorted( unique_predicate_data.keys() )
 
         try:
-            with open( train_file + ".cui_key", "w" ) as out_file:
+            with open( output_name + ".cui_key", "w" ) as out_file:
                 for cui in cui_keys:
                     if( cui_dense_input_mode is True ):
                         out_file.write( str( unique_cui_data[ cui ] ) + " " + str( cui ) + "\n" )
@@ -1068,16 +1165,16 @@ def PrintKeyFiles():
                         index      = vtr_data[0]
                         out_file.write( str( index ) + " " + str( cui ) + "\n" )
         except IOError:
-            PrintLog( "PrintKeyFiles() - Error: Unable To Create CUI Key File" )
+            PrintLog( "PrintKeyFiles() - Error: Unable To Create CUI Key File", 1 )
             return -1
         finally:
             out_file.close()
 
         PrintLog( "PrintKeyFiles() - File Created" )
-        PrintLog( "PrintKeyFiles() - Printing CUI Key File: " + train_file + ".predicate_key" )
+        PrintLog( "PrintKeyFiles() - Printing CUI Key File: " + output_name + ".predicate_key" )
 
         try:
-            with open( train_file + ".predicate_key", "w" ) as out_file:
+            with open( output_name + ".predicate_key", "w" ) as out_file:
                 for predicate in predicate_keys:
                     if( predicate_dense_input_mode is True ):
                         out_file.write( str( unique_predicate_data[ predicate ] ) + " " + str( predicate ) + "\n" )
@@ -1089,7 +1186,7 @@ def PrintKeyFiles():
                         index      = vtr_data[0]
                         out_file.write( str( index ) + " " + str( predicate ) + "\n" )
         except IOError:
-            PrintLog( "PrintKeyFiles() - Error: Unable To Create Predicate Key File" )
+            PrintLog( "PrintKeyFiles() - Error: Unable To Create Predicate Key File", 1 )
             return -1
         finally:
             out_file.close()
@@ -1159,7 +1256,7 @@ def Matthews_Correlation( y_true, y_pred ):
 
 def GetSubjectOneHotVector( cui ):
     if( cui not in unique_cui_data ):
-        PrintLog( "GetSubjectOneHotVector() - Error: CUI \"" + str( cui ) + "\" Not In Unique CUI Data List" )
+        PrintLog( "GetSubjectOneHotVector() - Error: CUI \"" + str( cui ) + "\" Not In Unique CUI Data List", 1 )
         return []
     
     vector = []
@@ -1180,7 +1277,7 @@ def GetSubjectOneHotVector( cui ):
 
 def GetPredicateOneHotVector( predicate ):
     if( predicate not in unique_predicate_data ):
-        PrintLog( "GetPredicateOneHotVector() - Error: Predicate \"" + str( predicate ) + "\" Not In Unique Predicate Data List" )
+        PrintLog( "GetPredicateOneHotVector() - Error: Predicate \"" + str( predicate ) + "\" Not In Unique Predicate Data List", 1 )
         return []
     
     vector = []
@@ -1201,7 +1298,7 @@ def GetPredicateOneHotVector( predicate ):
 
 def GetObjectOneHotCUIVector( cui ):
     if( cui not in unique_cui_data ):
-        PrintLog( "GetObjectOneHotCUIVector() - Error: CUI \"" + str( cui ) + "\" Not In Unique CUI Data List" )
+        PrintLog( "GetObjectOneHotCUIVector() - Error: CUI \"" + str( cui ) + "\" Not In Unique CUI Data List", 1 )
         return []
     
     vector                   = np.zeros( number_of_cuis )
@@ -1239,7 +1336,7 @@ def Batch_Gen( X, Y, batch_size ):
 
 #   Parses Through CUI Data And Generates Sparse Matrices For
 #   Concept Input, Predicate Input and Concept Output Data
-def GenerateNetworkData( start_index = None, end_index = None ):
+def GenerateNetworkData( passed_data = None, start_index = None, end_index = None ):
     global steps
     global batch_size
     global identified_cuis
@@ -1253,13 +1350,13 @@ def GenerateNetworkData( start_index = None, end_index = None ):
 
     # Check(s)
     if( train_file_data_length == 0 ):
-        PrintLog( "GenerateNetworkData() - Error: No CUI Data In Memory / Was An Input CUI File Read Before Calling Method?" )
+        PrintLog( "GenerateNetworkData() - Error: No CUI-Predicate Co-occurrence Data In Memory / Was An Input CUI-Predicate Co-Occurrence File Read Before Calling Method?", 1 )
         return [], [], []
     if( len( unique_cui_data ) == 0 ):
-        PrintLog( "GenerateNetworkData() - Error: No Unique CUI Data In Memory / Unique CUI Data Dictionary Empty" )
+        PrintLog( "GenerateNetworkData() - Error: No Unique CUI Data In Memory / Unique CUI Data Dictionary Empty", 1 )
         return [], [], []
     if( len( unique_predicate_data ) == 0 ):
-        PrintLog( "GenerateNetworkData() - Erros: No Unique Predicate Data In Memory / Unique Predicate Data Dictionary Empty" )
+        PrintLog( "GenerateNetworkData() - Erros: No Unique Predicate Data In Memory / Unique Predicate Data Dictionary Empty", 1 )
         return [], [], []
 
     PrintLog( "GenerateNetworkData() - Generating Network Matrices" )
@@ -1281,16 +1378,28 @@ def GenerateNetworkData( start_index = None, end_index = None ):
     index                   = 0
     number_of_skipped_lines = 0
     
-    # Parse Entire File If Start And Ending Indices Are Not Specified
-    if( start_index is None and end_index is None ):
-        temp_data = training_data
-        PrintLog( "GenerateNetworkData() - Warning: No Start-End Indices Specified / Generating Matrices Using All Training Data" )
+    # Use Passed Data By Parameter / Overrides Global "training_data"
+    if( passed_data is not None ):
+        # Fetch All Data In Passed Data Parameter
+        if( start_index is None and end_index is None ):
+            PrintLog( "GenerateNetworkData() - Parsing Entire Passed Data Parameter" )
+            temp_data = passed_data
+        # Fetch Passed Data In Batch Using Start/End Indices
+        else:
+            PrintLog( "GenerateNetworkData() - Passed Data Start Index: " + str( start_index ) + " - End Index: " + str( end_index ) )
+            temp_data = passed_data[start_index:end_index] 
+    # Use Training Data (global) Parameter
     else:
-    # Fetch Training Data In Batch
-        temp_data = training_data[start_index:end_index]
-        PrintLog( "GenerateNetworkData() - Training Data Start Index: " + str( start_index ) + " - End Index: " + str( end_index ) )
-        
-
+        # Fetch All Training Data
+        if( start_index is None and end_index is None ):
+            PrintLog( "GenerateNetworkData() - Warning: No Start-End Indices Specified / Generating Matrices Using All Training Data" )
+            temp_data = training_data
+        # Fetch Training Data In Batch Using Start/End Indices
+        else:
+            PrintLog( "GenerateNetworkData() - Training Data Start Index: " + str( start_index ) + " - End Index: " + str( end_index ) )
+            temp_data = training_data[start_index:end_index]
+            
+            
     for i in range( len( temp_data ) ):
         not_found_flag = False
         line = temp_data[i]
@@ -1393,13 +1502,13 @@ def GenerateNetworkData( start_index = None, end_index = None ):
 
     # Check(s)
     if( len( concept_input_indices ) is 0 ):
-        PrintLog( "GenerateNetworkData() - Error: Concept Input Indices List Contains No Data / Specified Subject CUIs In The Input Not File Not Within Unique CUI Data?" )
+        PrintLog( "GenerateNetworkData() - Error: Concept Input Indices List Contains No Data / Specified Subject CUIs In The Input Not File Not Within Unique CUI Data?", 1 )
     if( len( predicate_input_indices ) is 0 ):
-        PrintLog( "GenerateNetworkData() - Error: Predicate Input Indices List Contains No Data / Specified Predicates In The Input Not File Not Within Unique CUI Data?" )
+        PrintLog( "GenerateNetworkData() - Error: Predicate Input Indices List Contains No Data / Specified Predicates In The Input Not File Not Within Unique CUI Data?", 1 )
         PrintLog( "GenerateNetworkData() -        Note: This May Be Reporting Due To Concept Input Indices List Erroring Out" )
     if( len( concept_output_indices ) is 0 ):
-        PrintLog( "GenerateNetworkData() - Error: Concept Output Indices List Contains No Data / Specified Object CUIs In The Input Not File Not Within Unique CUI Data?" )
-        PrintLog( "GenerateNetworkData() -        Note: This May Be Reporting Due To Concept Input or Predicate Indices List Erroring Out" )
+        PrintLog( "GenerateNetworkData() - Error: Concept Output Indices List Contains No Data / Specified Object CUIs In The Input Not File Not Within Unique CUI Data?", 1 )
+        PrintLog( "GenerateNetworkData() -        Note: This May Be Reporting Due To Concept Input or Predicate Indices List Erroring Out"                               , 1 )
     if( len( concept_input_indices ) is 0 or len( predicate_input_indices ) is 0 or len( concept_output_indices ) is 0 ): return None, None, None
 
     # @REMOVEME - Sets The Number Of Steps If Not Specified
@@ -1494,9 +1603,6 @@ def GenerateNetworkData( start_index = None, end_index = None ):
     
     return concept_input_matrix, predicate_input_matrix, concept_output_matrix
 
-#   You're Welcome Megan
-def GenerateNetworkMatrices():
-    return GenerateNetworkData()
 
 """
     Creates A Keras Neural Network Using Input/Output Sparse Matrices and Returns The Network
@@ -1591,7 +1697,8 @@ def GenerateNeuralNetwork():
     sgd = optimizers.SGD( lr = learning_rate, momentum = momentum )
 
     PrintLog( "GenerateNeuralNetwork() - Compiling Model Using, Loss: BCE, Optimizer: SGD, Metrics: Accuracy, Precision, Recall, Matthews Correlation" )
-    model.compile( loss = 'binary_crossentropy', optimizer = sgd, metrics = ['accuracy', Precision, Recall, Matthews_Correlation] )
+    # " loss = 'binary_crossentropy' " Is Also A Keras Built-In Option
+    model.compile( loss = BCE, optimizer = sgd, metrics = ['accuracy', Precision, Recall, Matthews_Correlation] )
 
     # Print Model Summary
     PrintLog( "GenerateNeuralNetwork() - =========================================================" )
@@ -1611,13 +1718,13 @@ def TrainNeuralNetwork( neural_network_model = None, initial_epoch = None, conce
     
     # Check(s)
     if( neural_network_model is None ):
-        PrintLog( "TrainNeuralNetwork() - Error: Model Has Not Been Instantiated / Model == None" )
+        PrintLog( "TrainNeuralNetwork() - Error: Model Has Not Been Instantiated / Model == None", 1 )
     if( concept_input is None ):
-        PrintLog( "TrainNeuralNetwork() - Error: Concept Input Contains No Data" )
+        PrintLog( "TrainNeuralNetwork() - Error: Concept Input Contains No Data", 1 )
     if( predicate_input is None ):
-        PrintLog( "TrainNeuralNetwork() - Error: Predicate Input Contains No Data" )
+        PrintLog( "TrainNeuralNetwork() - Error: Predicate Input Contains No Data", 1 )
     if( concept_output is None ):
-        PrintLog( "TrainNeuralNetwork() - Error: Concept Output Contains No Data" )
+        PrintLog( "TrainNeuralNetwork() - Error: Concept Output Contains No Data", 1 )
     if( neural_network_model is None or concept_input is None or predicate_input is None or concept_output is None ):
         return -1
     
@@ -1625,13 +1732,13 @@ def TrainNeuralNetwork( neural_network_model = None, initial_epoch = None, conce
         PrintLog( "TrainNeuralNetwork() - Warning: Initial Epoch Value is None / Setting To \"0\"" )
         initial_epoch = 0
     if( type( initial_epoch ) is not int ):
-        PrintLog( "TrainNeuralNetwork() - Error: \"initial_epoch\" Variable Is Not Type \"Int\"" )
+        PrintLog( "TrainNeuralNetwork() - Error: \"initial_epoch\" Variable Is Not Type \"Int\"", 1 )
         return -1
 
     # Train The Model On The Inputs/Output
     PrintLog( "TrainNeuralNetwork() - Begin Model Training" )
     
-    if( training_stats_file != "" ):
+    if( training_stats_file != "" and process_eval_metrics_per_epoch is 0 ):
         csv_logger = CSVLogger( training_stats_file, append = True, separator = '\t')
         neural_network_model.fit( [concept_input, predicate_input], concept_output, callbacks = [csv_logger], shuffle = shuffle_input_data, initial_epoch = initial_epoch, epochs = initial_epoch + 1 )
     else:
@@ -1647,13 +1754,13 @@ def TrainNeuralNetwork( neural_network_model = None, initial_epoch = None, conce
 def EvaluateNetworkData( model, cui_input, predicate_input, cui_output ):
     # Check(s)
     if( model is None ):
-        PrintLog( "EvaluateNetworkData() - Error: Model Has Not Been Instantiated / Model == None" )
+        PrintLog( "EvaluateNetworkData() - Error: Model Has Not Been Instantiated / Model == None", 1 )
     if( cui_input == "" ):
-        PrintLog( "EvaluateNetworkData() - Error: Subject CUI Input Is Empty String" )
+        PrintLog( "EvaluateNetworkData() - Error: Subject CUI Input Is Empty String", 1 )
     if( predicate_input == "" ):
-        PrintLog( "EvaluateNetworkData() - Error: Predicate Input Is Empty String" )
+        PrintLog( "EvaluateNetworkData() - Error: Predicate Input Is Empty String", 1 )
     if( cui_output == "" ):
-        PrintLog( "EvaluateNetworkData() - Error: Object CUI Output Is Empty String" )
+        PrintLog( "EvaluateNetworkData() - Error: Object CUI Output Is Empty String", 1 )
     if( model is None or cui_input == "" or predicate_input == "" or cui_output == "" ):
         return -1, -1, -1, -1, -1
     
@@ -1716,10 +1823,10 @@ def EvaluateNetworkData( model, cui_input, predicate_input, cui_output ):
     
     # Check(s)
     if( len( cui_input_vectors ) == 0 or len( predicate_input_vectors ) == 0 or len( cui_output_vectors ) == 0 ):
-        PrintLog( "EvaluateNetworkData() - Error: One Or More Network Input/Output Vectors == 0" )
+        PrintLog( "EvaluateNetworkData() - Error: One Or More Network Input/Output Vectors == 0", 1 )
         return -1, -1, -1, -1, -1
     if( len( cui_input_vectors ) != len( predicate_input_vectors ) and len( cui_input_vectors ) != len( cui_output_vectors ) ):
-        PrintLog( "EvaluateNetworkData() - Error: Subject CUI, Predicate and/or Object Vector Lengths Not Equal" )
+        PrintLog( "EvaluateNetworkData() - Error: Subject CUI, Predicate and/or Object Vector Lengths Not Equal", 1 )
         return -1, -1, -1, -1, -1
     
     return model.evaluate( [cui_input_vectors, predicate_input_vectors], cui_output_vectors, verbose = 0 )
@@ -1729,11 +1836,11 @@ def EvaluateNetworkData( model, cui_input, predicate_input, cui_output ):
 def NetworkPredictOutput( model, cui_input, predicate_input ):
     # Check(s)
     if( model is None ):
-        PrintLog( "NetworkPredictOutput() - Error: Model Has Not Been Instantiated / Model == None" )
+        PrintLog( "NetworkPredictOutput() - Error: Model Has Not Been Instantiated / Model == None", 1 )
     if( cui_input == "" ):
-        PrintLog( "NetworkPredictOutput() - Error: Subject CUI Input Is Empty String" )
+        PrintLog( "NetworkPredictOutput() - Error: Subject CUI Input Is Empty String", 1 )
     if( predicate_input == "" ):
-        PrintLog( "NetworkPredictOutput() - Error: Predicate Input Is Empty String" )
+        PrintLog( "NetworkPredictOutput() - Error: Predicate Input Is Empty String", 1 )
     if( model is None or cui_input == "" or predicate_input == "" ):
         return -1
     
@@ -1783,10 +1890,10 @@ def NetworkPredictOutput( model, cui_input, predicate_input ):
         
     # Check(s)
     if( len( cui_input_vectors ) == 0 or len( predicate_input_vectors ) == 0 ):
-        PrintLog( "NetworkPredictOutput() - Error: One Or More Network Input Vectors == 0" )
+        PrintLog( "NetworkPredictOutput() - Error: One Or More Network Input Vectors == 0", 1 )
         return -1
     if( len( cui_input_vectors ) != len( predicate_input_vectors ) ):
-        PrintLog( "NetworkPredictOutput() - Error: CUI and Predicate Vector Lengths Not Equal" )
+        PrintLog( "NetworkPredictOutput() - Error: CUI and Predicate Vector Lengths Not Equal", 1 )
         return -1
     
     return model.predict( [cui_input_vectors, predicate_input_vectors], verbose = 0 )
@@ -1795,19 +1902,34 @@ def NetworkPredictOutput( model, cui_input, predicate_input ):
 def ProcessNeuralNetwork():
     global curr_training_data_index
     
+    eval_cui_input_matrix       = None
+    eval_cui_output_matrix      = None
+    training_stats_file_handle  = None
+    eval_predicate_input_matrix = None
+    
     # Train The Neural Network Using Specified Input/Output Matrices
     PrintLog( "ProcessNeuralNetwork() - Generating Actual Neural Network" )
     model = GenerateNeuralNetwork()
     PrintLog( "ProcessNeuralNetwork() - Finished Generating Neural Network" )
     
-    start_time = time.time()
+    if( process_eval_metrics_per_epoch is 1 ):
+        PrintLog( "ProcessNeuralNetwork() - Creating Training Statistics File" )
+        OpenTrainingStatsFileHandle()
+        
+        WriteStringToTrainingStatsFile( "Epoch\tLoss\tAccuracy\tPrecision\tRecall\tMatthews_Correlation" )
+        
+        PrintLog( "ProcessNeuralNetwork() - Generating Evaluation CUI Input, Predicate Input and CUI Output Matrices/Sequences" )
+        eval_cui_input_matrix, eval_predicate_input_matrix, eval_cui_output_matrix = GenerateNetworkData( evaluation_data )
     
+    start_time                   = time.time()
+    weight_dump_counter          = weight_dump_interval
+    curr_training_data_index     = 0
     number_of_remaining_elements = train_file_data_length
     
     for curr_epoch in range( number_of_epochs ):
         while( number_of_remaining_elements > 0 ):
             PrintLog( "ProcessNeuralNetwork() - Current Epoch: " + str( curr_epoch ) + "/" + str( number_of_epochs ) )
-            cui_input, predicate_input, cui_output = GenerateNetworkData( curr_training_data_index, curr_training_data_index + batch_size )
+            cui_input, predicate_input, cui_output = GenerateNetworkData( None, curr_training_data_index, curr_training_data_index + batch_size )
             
             PrintLog( "ProcessNeuralNetwork() - Passing Input/Output Sequences/Matrices To Network" )
             TrainNeuralNetwork( model, curr_epoch, cui_input, predicate_input, cui_output )
@@ -1818,69 +1940,106 @@ def ProcessNeuralNetwork():
             
             if( debug_log is 0 ): print( "\n" )
         
+        PrintLog( "ProcessNeuralNetwork() - Finished Epoch: " + str( curr_epoch ) + " Training" )
+        
+        weight_dump_counter          += 1
         curr_training_data_index     = 0
         number_of_remaining_elements = train_file_data_length
+        
+        # Neural Network Weight Dumping Per Epoch
+        if( weight_dump_interval > 0 ):
+            PrintLog( "ProcessNeuralNetwork() - Current Weight Dump Counter: " + str( weight_dump_counter ) )
+            
+            # Save The Weights Of The Current Network To A File Based Upon "weight_dump_interval" Variable
+            if( weight_dump_counter >= weight_dump_interval ):
+                    PrintLog( "ProcessNeuralNetwork() - Weight Dump Interval Met Or Exceeded / Saving Neural Network Weights For Epoch: " + str( curr_epoch ) )
+                    PrintLog( "ProcessNeuralNetwork() -     Saving Current Epoch Network Weights To File: \"" + output_file_name + "_epoch_" + str( curr_epoch ) + "_model_weights.h5" + "\"" )
+                    model.save_weights( output_file_name + "_epoch_" + str( curr_epoch ) + "_model_weights.h5" )
+                    weight_dump_counter = 0
+        
+        # Training Statistics Based On Evaluation File
+        if( process_eval_metrics_per_epoch is 1 ):
+            PrintLog( "ProcessNeuralNetwork() - Evaulating Current Network Using Evaluation Data" )
+            loss, accuracy, precision, recall, matthews_correlation = model.evaluate( [ eval_cui_input_matrix, eval_predicate_input_matrix ], eval_cui_output_matrix )
+            
+            PrintLog( "ProcessNeuralNetwork() - Epoch " + str( curr_epoch ) + " - Complete Metrics: Loss: " + str( loss )
+                     + "\tAccuracy: " + str( accuracy ) + "\tPrecision: " + str( precision ) + "\tRecall: " + str( recall )
+                     + "\tMatthews_Correlation: " + str( matthews_correlation ) )
+            WriteStringToTrainingStatsFile( str( curr_epoch ) + "\t" + str( loss ) + "\t" + str( accuracy ) + "\t"
+                                           + str( precision ) + "\t" + str( recall ) + "\t" + str( matthews_correlation ) )
+        
+    if( process_eval_metrics_per_epoch is 1 ):
+        PrintLog( "ProcessNeuralNetwork() - Closing Training Statistics File" )
+        CloseTrainingStatsFileHandle()
 
     PrintLog( "ProcessNeuralNetwork() - Training Time: %s secs" % ( time.time() - start_time ) )
 
     # Save Network Model
-    PrintLog( "ProcessNeuralNetwork() - Saving Model: \"trained_nn_model.h5\"" )
-    model.save( "trained_nn_model.h5" )
+    PrintLog( "ProcessNeuralNetwork() - Saving Model: \"" + output_file_name + "_model.h5\"", 1 )
+    model.save( output_file_name + "_model.h5" )
 
     # Save Model Architechture in JSON Format
-    PrintLog( "ProcessNeuralNetwork() - Saving Model Architecture: \"model_architecture.json\"" )
-    with open( 'model_architecture.json', 'w' ) as out_file:
+    PrintLog( "ProcessNeuralNetwork() - Saving Model Architecture: \"" + output_file_name + "_model_architecture.json\"", 1 )
+    with open( output_file_name + '_model_architecture.json', 'w' ) as out_file:
         out_file.write( model.to_json() )          # Same as trained_nn.get_config()
     out_file.close()
 
     # Save Trained Network Weights
-    PrintLog( "ProcessNeuralNetwork() - Saving Model Weights: \"trained_nn_model_weights.h5\"" )
-    model.save_weights( "trained_nn_model_weights.h5" )
+    PrintLog( "ProcessNeuralNetwork() - Saving Model Weights: \"" + output_file_name + "_model_weights.h5\"", 1 )
+    model.save_weights( output_file_name + "_model_weights.h5" )
 
     # Print Model Depiction To File
-    PrintLog( "ProcessNeuralNetwork() - Generating Visual Model: \"model_visual.png\"" )
-    plot_model( model, to_file = 'model_visual.png' )
+    PrintLog( "ProcessNeuralNetwork() - Generating Visual Model: \"" + output_file_name + "_model_visual.png\"", 1 )
+    plot_model( model, to_file = output_file_name + '_model_visual.png' )
     
     # Model Evaluation Test
-    PrintLog( "ProcessNeuralNetwork() - Evaluating Model" )
-    
     # Get First CUI, First Predicate And First CUI As Input, Input and Output (Although It May Not Be Correct), Forward Propagate Through The Network To Predict Accuracy
     if( test_input_cui != "" and test_input_predicate != "" and test_output_cui != "" ):
-        PrintLog( "ProcessNeuralNetwork() - Evaluating Inputs - CUI: \"" + str( test_input_cui ) + "\" and Predicate: \"" + str( test_input_predicate ) + "\" Versus Output CUI: \"" + str( test_output_cui ) + "\""  )
+        PrintLog( "ProcessNeuralNetwork() - Evaluating Model", 1 )
+        PrintLog( "ProcessNeuralNetwork() - Evaluating Inputs - CUI: \"" + str( test_input_cui ) + "\" and Predicate: \"" + str( test_input_predicate ) + "\" Versus Output CUI: \"" + str( test_output_cui ) + "\"", 1 )
         loss, accuracy, precision, recall, matthews_correlation = EvaluateNetworkData( model, test_input_cui, test_input_predicate, test_output_cui )
-        PrintLog( "ProcessNeuralNetwork() - Loss: " + str( loss ) + " - Accuracy: " + str( accuracy ) + " - Precision: " + str( precision ) + " - Matthews Correlation: " + str( matthews_correlation ) )
+        PrintLog( "ProcessNeuralNetwork() - Loss: " + str( loss ) + " - Accuracy: " + str( accuracy ) + " - Precision: " + str( precision ) + " - Matthews Correlation: " + str( matthews_correlation ), 1 )
     
     if( test_input_cui != "" and test_input_predicate != "" ):
-        PrintLog( "ProcessNeuralNetwork() - Predicting Output Given Inputs -> CUI: \"" + str( test_input_cui ) + "\" and Predicate: \"" + str( test_input_predicate ) + "\"" )
+        PrintLog( "ProcessNeuralNetwork() - Predicting Output Given Inputs -> CUI: \"" + str( test_input_cui ) + "\" and Predicate: \"" + str( test_input_predicate ) + "\"", 1 )
         predicted_cui_indices = NetworkPredictOutput( model, test_input_cui, test_input_predicate )
-        PrintLog( "ProcessNeuralNetwork() - Predicted CUI Indices: " + str( predicted_cui_indices ) )
+        PrintLog( "ProcessNeuralNetwork() - Predicted CUI Indices: " + str( predicted_cui_indices ), 1 )
     
     return 0
 
 #   Removes Unused Data From Memory
 def CleanUp():
     global training_data
+    global evaluation_data
     global identified_cuis
     global unique_cui_data
     global unidentified_cuis
     global cui_embedding_matrix
+    global eval_cui_input_matrix
     global identified_predicates
     global unique_predicate_data
+    global eval_cui_output_matrix
     global unidentified_predicates
     global predicate_embedding_matrix
+    global eval_predicate_input_matrix
 
     PrintLog( "CleanUp() - Removing Data From Memory" )
 
-    unique_cui_data            = None
-    training_data              = None
-    cui_embedding_matrix       = None
-    unique_predicate_data      = None
-    predicate_embedding_matrix = None
+    unique_cui_data              = None
+    training_data                = None
+    cui_embedding_matrix         = None
+    unique_predicate_data        = None
+    predicate_embedding_matrix   = None
 
-    identified_cuis            = None
-    identified_predicates      = None
-    unidentified_cuis          = None
-    unidentified_predicates    = None
+    identified_cuis              = None
+    identified_predicates        = None
+    unidentified_cuis            = None
+    unidentified_predicates      = None
+    
+    evaluation_data              = None
+    eval_cui_input_matrix        = None
+    eval_predicate_input_matrix  = None
+    eval_cui_output_matrix       = None
 
     gc.collect()
 
@@ -1912,7 +2071,7 @@ def Main():
         predicate_file_loaded = LoadVectorFile( predicate_vector_file, False )
     
         if( cui_file_loaded == -1 or predicate_file_loaded == -1 ):
-            PrintLog( "Main() - Error: Unable To Load Vector File(s) / Auto-Generating One-Hot Vectors Using Co-Occurrence Data" )
+            PrintLog( "Main() - Warning: Unable To Load Vector File(s) / Auto-Generating One-Hot Vectors Using Co-Occurrence Data (CNDA Mode)", 1 )
     
     # Set Numpy Print Options/Length To "MAXSIZE" ( Used To Debug GenerateNetworkData() Function )    @REMOVEME
     # np.set_printoptions( threshold = sys.maxsize )
