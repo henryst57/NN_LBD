@@ -229,7 +229,7 @@
 
     <OutputFileName>        -> Specifies An Output File Name For The Keras Model, Weights, Architecture And Visual Image Files
     
-      Ex: <OutputFileName> = "cui_mini"
+      Ex: <OutputFileName> = "cui_mini_sparse"
           Network Output File Names:
               - cui_mini_sparse_model.h5
               - cui_mini_sparse_model_weights.h5
