@@ -5,7 +5,7 @@
 #    -------------------------------------------                                           #
 #                                                                                          #
 #    Date:    10/02/2018                                                                   #
-#    Revised: 12/01/2018                                                                   #
+#    Revised: 12/03/2018                                                                   #
 #                                                                                          #
 #    Generates A Neural Network Using A Configuration File.                                #
 #      - Supports Dense and Sparse Input Vectors In All Combinations Of CUI and            #
@@ -1959,7 +1959,7 @@ def ProcessNeuralNetwork():
         
         # Training Statistics Based On Evaluation File
         if( process_eval_metrics_per_epoch is 1 ):
-            PrintLog( "ProcessNeuralNetwork() - Evaulating Current Network Using Evaluation Data" )
+            PrintLog( "ProcessNeuralNetwork() - Evaluating Current Network Using Evaluation Data" )
             loss, accuracy, precision, recall, matthews_correlation = model.evaluate( [ eval_cui_input_matrix, eval_predicate_input_matrix ], eval_cui_output_matrix )
             
             PrintLog( "ProcessNeuralNetwork() - Epoch " + str( curr_epoch ) + " - Complete Metrics: Loss: " + str( loss )
@@ -1971,6 +1971,9 @@ def ProcessNeuralNetwork():
     if( process_eval_metrics_per_epoch is 1 ):
         PrintLog( "ProcessNeuralNetwork() - Closing Training Statistics File" )
         CloseTrainingStatsFileHandle()
+        eval_cui_input_matrix       = None
+        eval_predicate_input_matrix = None
+        eval_cui_output_matrix      = None
 
     PrintLog( "ProcessNeuralNetwork() - Training Time: %s secs" % ( time.time() - start_time ) )
 
