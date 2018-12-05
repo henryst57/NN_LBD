@@ -1,0 +1,61 @@
+use strict;
+use warnings;
+use lib '../';
+use Utilitites;
+
+#User Input
+my $knownFile = 'known';
+my $trueFile = 'true';
+my $vocabSize = 1000;
+
+#Auto-Generated Output FileNames
+my $knownOut = "known_$vocabSize";
+my $trueOut = "true_$vocabSize";
+
+
+
+################################################
+# Begin Code
+################################################
+
+
+#read the matrix and vocab
+my $knownMatrix = &Utilities::readSemMedFile($knownFile);
+my ($vocabularyRef, $relationTypesRef) = &Utilities::getVocabularyAndPredicateTypes($knownMatrix);
+
+#randomly?? select $vocabSize terms
+my %sampledVocab = ();
+foreach my $cui (keys %{$vocabularyRef}) {
+    $sampledVocab{$cui} = 1;
+    if (scalar keys %sampledVocab >= $vocabularySize) {
+	last;
+    }
+}
+
+#generate the reduced known set
+my %reducedKnownMatrix = ();
+foreach my $triplet (keys %{$knownMatrix}) {
+    my ($subject, $predicate, $object) = split($triplet);
+    if (defined $sampledVocab{$subject} && $sampledVocab{$object}) {
+	$reducedKnown{$triplet} = 1;
+    }
+}
+
+#generate the reduuced true set
+my $trueMatrix = &Utilities::readSemMedFile($trueFile);
+my %reducedTrueMatrix = ();
+foreach my $triplet (keys %{$trueMatrix}) {
+    my ($subject, $predicate, $object) = split($triplet);
+    if (defined $sampledVocab{$subject} && $sampledVocab{$object}) {
+	$reducedTrue{$triplet} = 1;
+    }
+}
+
+#output the reduced known and reduced true
+&Utilities::outputDataset($reducedKnownMatrix, $knownOut);
+&Utilities::outputDataset($reducedTrueMatrix, $trueOut);
+
+#Done!
+print "Done!\n";
+
+
