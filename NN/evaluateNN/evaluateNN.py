@@ -26,13 +26,17 @@ import sys
 import re
 import gc
 import time
+import os
 
 #reference Clint's code
 # make sure main() is not called or the whole program will run
 # this reference only allows the functions and variables to be called using the same namespace
-sys.path.append('../trainNN')
+trainNN_path = os.environ.get('NN_PATH', '..') + "/trainNN"
+print(trainNN_path)
+sys.path.append(trainNN_path)
+#sys.path.append('../trainNN')
+import trainNN as trainNN
 from trainNN import *
-
 
 
 ########################
@@ -73,6 +77,8 @@ def ReadConfigFile_EVAL( config_file_path ):
 	global cui_key_file
 	global eval_output_file
 
+	ReadConfigFile(config_file_path)
+
 	# Check(s)
 	if CheckIfFileExists( config_file_path ) == False:
 		PrintLog( "ReadConfigFile_EVAL() - Error: Specified File \"" + str( config_file_path ) + "\" Does Not Exist" )
@@ -107,13 +113,15 @@ def ReadConfigFile_EVAL( config_file_path ):
 	f.close()
 
 	#grab the key files as well if not specified
-	if(train_file):
-		if(cui_key_file == ""):
-			cui_key_file = (train_file + ".cui_key")
-		if(pred_key_file == ""):
-			pred_key_file = (train_file + ".predicate_key")
-	elif(not train_file and ((cui_key_file == "") or (pred_key_file == "")) ):
-		PrintLog( "ReadConfigFile_EVAL() - Error: \"train_file\" Variable Not Set!" )
+	if(trainNN.train_file):
+		if(not cui_key_file or cui_key_file == ""):
+			PrintLog("ReadConfigFile_EVAL() - Warning: CUI Key File not set - generating path from train_file")
+			cui_key_file = (trainNN.train_file + ".cui_key")
+		if(not pred_key_file or pred_key_file == ""):
+			PrintLog("ReadConfigFile_EVAL() - Warning: Predicate Key File not set - generating path from from train_file")
+			pred_key_file = (trainNN.train_file + ".predicate_key")
+	elif(not trainNN.train_file and ((cui_key_file == "") or (pred_key_file == "")) ):
+		PrintLog( "ReadConfigFile_EVAL() - Error: \"train_file\" Variable Not Set! Cannot create keys" )
 		exit()
 
 	#file existence checks
@@ -175,7 +183,7 @@ def LoadModel():
 
 	#weights are needed as well
 	model.load_weights(model_weights_file)
-	PrintLog("Loaded the model from %s" % model_file)
+	PrintLog(("Loaded the model from " + model_file))
 
 	#prints a summary of the model for debugging
 	model.summary()
@@ -195,7 +203,7 @@ def LoadEvalFile():
 		with open( eval_file, "r" ) as in_file:
 			cui_occurence_data = in_file.readlines()
 			if(len(cui_occurence_data) < 1):
-				PrintLog("LoadEvalFile() - Error: Evaluation file [%s] has no lines", % eval_file)
+				PrintLog(("LoadEvalFile() - Error: Evaluation file ["+ str(eval_file) +"] has no lines"))
 	except FileNotFoundError:
 		PrintLog( "LoadEvalFile() - Error: Unable To Open File \"" + str( eval_file )+ "\"" )
 		return -1
@@ -224,13 +232,14 @@ def LoadUniqKeys():
 	#read in cui key file
 	try:
 		with open( cui_key_file, "r" ) as cui_in_file:
+			clines = cui_in_file.readlines()
 			#save to a hash function in the format
 			#  ucd[CUI] = index
-			if(len(cui_in_file) < 1):
-				PrintLog("LoadUniqKeys() - Error: no lines found in cui_in_file %s", % cui_key_file)
+			if(len(clines) < 1):
+				PrintLog("LoadUniqKeys() - Error: no lines found in cui_in_file " + cui_key_file)
 				exit()
 
-			for line in cui_in_file:
+			for line in clines:
 				(index, cuiVal) = line.split()
 				unique_cui_data[str(cuiVal)] = int(index)
 	except FileNotFoundError:
@@ -242,13 +251,14 @@ def LoadUniqKeys():
 	#read in pred key file
 	try:
 		with open( pred_key_file, "r" ) as pred_in_file:
+			plines = pred_in_file.readlines()
 			#save to a hash function in the format
-			#  upd[CUI] = index
-			if(len(cui_in_file) < 1):
-				PrintLog("LoadUniqKeys() - Error: no lines found in pred_in_file %s", % pred_in_file)
+			#  ucd[CUI] = index
+			if(len(plines) < 1):
+				PrintLog("LoadUniqKeys() - Error: no lines found in pred_in_file " + pred_in_file)
 				exit()
 
-			for line in pred_in_file:
+			for line in plines:
 				(index, predVal) = line.split()
 				unique_predicate_data[str(predVal)] = int(index)
 	except FileNotFoundError:
@@ -295,7 +305,7 @@ def GenerateNetworkMatrices():
 	# Sets The Number Of Steps If Not Specified
 	if( steps == 0 ):
 		PrintLog( "LoadUniqKeys() - Warning: Number Of Steps Not Specified / Generating Value Based On Data Size" )
-		steps = int( cui_occurence_data_length / batch_size ) + ( 0 if( cui_occurence_data_length % batch_size == 0 ) else 1 )
+		steps = int( cui_occurence_data_length / trainNN.batch_size ) + ( 0 if( cui_occurence_data_length % trainNN.batch_size == 0 ) else 1 )
 		PrintLog( "LoadUniqKeys() - Number Of Steps: " + str( steps ) )
 
 
@@ -466,7 +476,7 @@ def Evaluate(concept_input, predicate_input, concept_output, metricSet):
 	model = LoadModel()
 
 	#recreate the model with the parameters set by the configuration
-	sgd = optimizers.SGD( lr = learning_rate, momentum = momentum )
+	sgd = optimizers.SGD( lr = trainNN.learning_rate, momentum = trainNN.momentum )
 	model.compile(loss = BCE, optimizer = sgd, metrics = metricSet)
 	eval_metrics = model.evaluate_generator(generator = Batch_Gen([concept_input, predicate_input], concept_output, batch_size = batch_size ), steps = steps, verbose=1)
 	
@@ -477,7 +487,10 @@ def Evaluate(concept_input, predicate_input, concept_output, metricSet):
 	#export the results from the evaluation to a file
 	f = open(eval_output_file, "w+")
 	f.write("EVALUATION METRICS:\n")
-	for m in range(len(metricSet)):
+	for mv in range(len(metricSet)):
+
+		m = metricSet[mv]
+		
 		#make a cleaner format for the output
 		metricType = ""
 		if(m == Precision):
@@ -486,9 +499,12 @@ def Evaluate(concept_input, predicate_input, concept_output, metricSet):
 			metricType = "Recall"
 		elif(m == Matthews_Correlation):
 			metricType = "Matthews_Correlation"
+		elif(m == 'accuracy'):
+			metricType = "Accuracy"
+	
 
 		#write to the output
-		f.write(metricType + ": " + str(eval_metrics[m]) + "\n")
+		f.write(metricType + ": " + str(eval_metrics[mv]) + "\n")
 
 
 
@@ -512,8 +528,11 @@ def main():
 
 	PrintLog(("evaluateNN.py Main() - Reading in Parameters from config file: %s\n", config_file))
 
-	result = ReadConfigFile( config_file )
+	print("BATCH 1: " + str(trainNN.batch_size))
+	#result = ReadConfigFile( config_file )
 	result2 = ReadConfigFile_EVAL( config_file )
+	
+	#result2 = ReadConfigFile_EVAL( config_file )
 
 	PrintLog("evaluateNN.py Main() - Generating Network Matrices from evaluation file\n" )
 

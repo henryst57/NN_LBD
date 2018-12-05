@@ -26,6 +26,11 @@
       - Pydot                  -> Install via "pip install pydot" or "conda install pydot"
          * Windows Installations Will Require Installing "GraphViz" Program *
 
+    This script uses functions defined in trainNN.py. In order for the script to access these functions, the 
+    environment variable $NN_PATH must be set to the absolute path of the modules (NN directory.) 
+    To automatically set this environment variable, run the "setNNPathVar.sh" script found in the same directory.
+    This will set up the environment variable and export it for global use on the user's system.
+
     In order to run this script, trainNN.py must be run and a model file with weights must be saved
     This must be a ".h5" file type to be used with the built in libraries
     These files are automatically generated if trainNN.py is run prior

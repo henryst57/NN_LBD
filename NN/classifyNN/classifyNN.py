@@ -30,7 +30,11 @@ import time
 #reference Clint's code
 # make sure main() is not called or the whole program will run
 # this reference only allows the functions and variables to be called using the same namespace
-sys.path.append('../trainNN')
+trainNN_path = os.environ.get('NN_PATH', '..') + "/trainNN"
+print(trainNN_path)
+sys.path.append(trainNN_path)
+#sys.path.append('../trainNN')
+import trainNN as trainNN
 from trainNN import *
 
 
@@ -68,6 +72,8 @@ def ReadConfigFile_CLASSIFY( config_file_path ):
 	global cui_key_file
 	global prediction_out_file
 
+	ReadConfigFile(config_file_path)
+
 	# Check(s)
 	if CheckIfFileExists( config_file_path ) == False:
 		PrintLog( "ReadConfigFile_CLASSIFY() - Error: Specified File \"" + str( config_file_path ) + "\" Does Not Exist" )
@@ -101,13 +107,15 @@ def ReadConfigFile_CLASSIFY( config_file_path ):
 	f.close()
 
 	#grab the key files as well if not specified
-	if(train_file):
-		if(cui_key_file == ""):
-			cui_key_file = (train_file + ".cui_key")
-		if(pred_key_file == ""):
-			pred_key_file = (train_file + ".predicate_key")
-	elif(not train_file and ((cui_key_file == "") or (pred_key_file == "")) ):
-		PrintLog( "ReadConfigFile_CLASSIFY() - Error: \"train_file\" Variable Not Set!" )
+	if(trainNN.train_file):
+		if(not cui_key_file or cui_key_file == ""):
+			PrintLog("ReadConfigFile_EVAL() - Warning: CUI Key File not set - generating path from train_file")
+			cui_key_file = (trainNN.train_file + ".cui_key")
+		if(not pred_key_file or pred_key_file == ""):
+			PrintLog("ReadConfigFile_EVAL() - Warning: Predicate Key File not set - generating path from from train_file")
+			pred_key_file = (trainNN.train_file + ".predicate_key")
+	elif(not trainNN.train_file and ((cui_key_file == "") or (pred_key_file == "")) ):
+		PrintLog( "ReadConfigFile_EVAL() - Error: \"train_file\" Variable Not Set! Cannot create keys" )
 		exit()
 
 	#file existence checks
@@ -116,9 +124,6 @@ def ReadConfigFile_CLASSIFY( config_file_path ):
 		exit()
 	elif(not model_weights_file):	
 		PrintLog("ReadConfigFile_EVAL() - Error: \"model_weights_file\" variable not set!")
-		exit()
-	elif(not eval_file):
-		PrintLog("ReadConfigFile_EVAL() - Error: \"eval_file\" variable not set!")
 		exit()
 
 
@@ -187,13 +192,14 @@ def LoadUniqKeys():
 	#read in cui key file
 	try:
 		with open( cui_key_file, "r" ) as cui_in_file:
+			clines = cui_in_file.readlines()
 			#save to a hash function in the format
 			#  ucd[CUI] = index
-			if(len(cui_in_file) < 1):
-				PrintLog("LoadUniqKeys() - Error: no lines found in cui_in_file %s", % cui_key_file)
+			if(len(clines) < 1):
+				PrintLog("LoadUniqKeys() - Error: no lines found in cui_in_file " + cui_key_file)
 				exit()
 
-			for line in cui_in_file:
+			for line in clines:
 				(index, cuiVal) = line.split()
 				unique_cui_data[str(cuiVal)] = int(index)
 	except FileNotFoundError:
@@ -205,13 +211,14 @@ def LoadUniqKeys():
 	#read in pred key file
 	try:
 		with open( pred_key_file, "r" ) as pred_in_file:
+			plines = pred_in_file.readlines()
 			#save to a hash function in the format
-			#  upd[CUI] = index
-			if(len(cui_in_file) < 1):
-				PrintLog("LoadUniqKeys() - Error: no lines found in pred_in_file %s", % pred_in_file)
+			#  ucd[CUI] = index
+			if(len(plines) < 1):
+				PrintLog("LoadUniqKeys() - Error: no lines found in pred_in_file " + pred_in_file)
 				exit()
 
-			for line in pred_in_file:
+			for line in plines:
 				(index, predVal) = line.split()
 				unique_predicate_data[str(predVal)] = int(index)
 	except FileNotFoundError:
@@ -381,7 +388,7 @@ def Classify(cui, pred, concept_input, predicate_input):
 	#rank the predictions from highest to lowest
 	ranked = sorted(cuiPredictSet, key=cuiPredictSet.get, reverse=True)
 	for i in ranked:
-		DebugLog(("\t%s = [%s]\n" % (i, cuiPredictSet[i])))
+		trainNN.PrintLog(("\t%s = [%s]\n" % (i, cuiPredictSet[i])))
 		f.write("\t%s = [%s]\n" % (i, cuiPredictSet[i]))
 
 
@@ -409,7 +416,6 @@ def main():
 	#read in the parameters and configuration
 	PrintLog(("classifyNN.py Main() - Reading in Parameters from config file: %s\n", config_file))
 
-	result = ReadConfigFile( config_file )
 	result = ReadConfigFile_CLASSIFY( config_file )
 
 	PrintLog("classifyNN.py Main() - Rebuilding Model\n")
@@ -417,7 +423,7 @@ def main():
 	#load the model from the specified file
 	LoadModel()
 	#get the model together
-	sgd = optimizers.SGD( lr = learning_rate, momentum = momentum )
+	sgd = optimizers.SGD( lr = trainNN.learning_rate, momentum = trainNN.momentum )
 	model.compile(loss = BCE, optimizer = sgd, metrics = ['accuracy', Precision, Recall, Matthews_Correlation])
 
 	#allow user input until the user enters "" or empty string
@@ -431,7 +437,7 @@ def main():
 		
 		#PrintLog(cuiInputMat)
 		#PrintLog("\n\n")
-		if(cuiInputMat and predInputMat):
+		if(cuiInputMat != None and predInputMat != None):
 			Classify(cuiTest, predTest, cuiInputMat, predInputMat)
 		else:
 			PrintLog("classifyNN.py Main() - Error: Input matrices could not be created for CUI: %s and Predicate: %s! Try another value" % cuiTest, predTest)
