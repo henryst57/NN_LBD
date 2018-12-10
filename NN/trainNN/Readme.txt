@@ -186,7 +186,7 @@
 #                                                                          #
 ############################################################################
 
-    AdjustVectors           -> Optimizes CUI/Predicate Vectors, Removing Vector Data Not In Training File And Re-organizes Vector Indices
+    <AdjustVectors>           -> Optimizes CUI/Predicate Vectors, Removing Vector Data Not In Training File And Re-organizes Vector Indices
     
       This parameter optimizes user-specified vector data based on the training file. Vectors not present within the training file data are removed
       from the vector specified unique cui and predicate data lists. Hard-Coded vector index:value data is re-mapped based on data present in the
@@ -334,7 +334,7 @@
       
       Note: Generating statistics based on the evaluation file depends on specifying <TestingStatsFile> and <EvaluateFile> Parameters. If both of
             these are not specified, the network will not compute evaluation/testing statistics. In the event the <EvaluateFile> parameter is
-            specified but does not exist, the script will report and error and terminate. Specifying this parameter will result in increased
+            specified but does not exist, the script will report an error and terminate. Specifying this parameter will result in increased
             training times during network training.
       
       
