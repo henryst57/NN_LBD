@@ -43,6 +43,7 @@
         
         ^ This represents the "cui_mini" test/debug dataset mentioned in the segments below.
 
+
 ############################################################################
 #                                                                          #
 #    Running The Script                                                    #
@@ -73,20 +74,23 @@
         <DropoutAMT>:0.25
         <PrintKeyFiles>:1
         <TrainFile>:data\cui_mini
+        <EvaluateFile>:data\cui_mini_eval
         <TestInputCUI>:C001
         <TestInputPredicate>:ISA
         <TestOutputCUI>:C003
         <ConceptVectorFile>:samplevectors\testSparseCUIVectors.bin
         <PredicateVectorFile>:samplevectors\testSparsePredicateVectors.bin
         <TrainingStatsFile>:training_stats_file.txt
+        <TestingStatsFile>:testing_stats_file.txt
     
     To execute training with the parameters in this file use the command:
         "python trainNN.py config.cfg" or "python3 trainNN.py config.cfg"
     
     This instructs the TrainNN script to execute training based on these parameters.
     Also prints debug statements to the console (DebugLog=1). Prints the CUI and Predicate
-    Key Files (PrintKeyFiles=1) and report metrics after each epoch to a file named
-    "training_stats_file.txt"; Using the network parameters such Layer1Size, Layer2Size,
+    Key Files (PrintKeyFiles=1), report complete training metrics after each epoch to a file
+    named "training_stats_file.txt" and report evaluation metrics after each epoch to a file
+    named "testing_stats_file.txt"; Using the network parameters such Layer1Size, Layer2Size,
     NumberOfEpochs, LearningRate, BatchSize, Momentum and DropoutAMT values over the
     Training File "cui_mini" given the Concept and Predicate vector files. After
     training has completed, the script will use the parameters "TestInputCUI,
@@ -108,6 +112,7 @@
     *** To Use TrainNN in CNDA mode, leave concept and predicate vectors as empty strings.
         TrainNN will build sparse representation automatically given the training file and
         train the network accordingly, similar to CNDA v0.8 with MCC. 
+
 
 ############################################################################
 #                                                                          #
@@ -161,6 +166,7 @@
     <PredicateVectorFile>   -> Predicate Vector File Used To Train The Network                                                             [ Type String                              ]
     <PredicateListFile>     -> Predicate List File                                                                                         [ Type String                              ]
     <TrainingStatsFile>     -> File To Print Training Statistics To After Each Epoch                                                       [ Type String                              ]
+    <TestingStatsFile>      -> File To Print Testing Statistics To After Each Epoch                                                        [ Type String                              ]
     <OutputFileName>        -> Specifies An Output File Name For The Keras Model, Weights, Architecture And Visual Image Files             [ Type String                              ]
     <PrintNetworkInputs>    -> Prints Raw Network Input/Output Data (Matrices) Prior To Sending To The Network As Input/Expected Output    [ Type Int: 1 = True / 0 = False (Default) ]
     <PrintMatrixStats>      -> Prints Statistics On Network Input/Output Matrix/Sequence Generation                                        [ Type Int: 1 = True / 0 = False (Default) ]
@@ -172,6 +178,7 @@
     Note: Leaving ConceptVectorFile and PredicateVectorFile as empty string (blank) will enable
           TrainNN to operate in CNDA mode which generates sparse vectors given the training file,
           then trains the network accordingly and similarly to CNDA v0.8 with MCC.
+
 
 ############################################################################
 #                                                                          #
@@ -256,15 +263,61 @@
       
       Ex. <OutputFileName> = "cui_mini" and the current epoch is 2, the file name of the dumped weights will be:
           "cui_mini_epoch_2_model_weights.h5"
-          
+    
+    
+    <TrainingStatsFile>     -> File To Print Complete Training Data Based Training Statistics To After Each Epoch
+    
+      By default network training metric output is based on a batch-by-batch basis. Using this parameter, the script will print
+      calculated neural network metrics after each epoch using the entire training dataset. An example can be seen below:
+      
+      Example (Complete Training Dataset Based) File Output:
+          Epoch	Loss	Accuracy	Precision	Recall	Matthews_Correlation
+          0	0.10790298134088516	0.27450981736183167	0.6086956262588501	0.5400000214576721	0.6931508779525757
+          1	0.09702833741903305	0.26923078298568726	0.6086956262588501	0.5300000309944153	0.6928690671920776
+          2	0.03856460377573967	0.24528302252292633	0.5652173757553101	0.5	0.6959676742553711
+          3	...
+          n   0.2028554230928421	0.37037035822868347	0.43478259444236755	0.699999988079071	0.6662446856498718
+        
+      Note: By default the script will print statistics to a file named <OutputFileName> + "_training_stats.txt" when this
+            parameter is not specifed and computes batch-based metrics. Below represents an example of the batch-based
+            training output, note the different categorical names and order on the first line.
+      
+      Example (Default Batch-Based) File Output:
+          epoch	Matthews_Correlation	Precision	Recall	acc	loss
+          0	0.07128726691007614	0.25999999046325684	0.5652173757553101	0.10000000149011612	0.8585349321365356
+          1	0.023762421682476997	0.23999999463558197	0.52173912525177	0.10000000149011612	0.860185444355011
+          2	-0.07881104201078415	0.20000000298023224	0.47826087474823	0.10000000149011612	0.8608811497688293
+          3	...
+          n	0.1346537321805954	0.3055555522441864	0.47826087474823	0.10000000149011612	0.8561884164810181
+      
+      Note: Specifying this parameter will result in increased training times during network training.
+    
+    
+    <TestingStatsFile>     -> File To Print Testing Statistics Based on <EvaluateFile> To After Each Epoch
+    
+      Using this parameter, the script will print calculated neural network metrics after each epoch using the entire <EvaluateFile> dataset.
+      This is typically used to compare training and testing datasets during network training for comparison purposes. An example can be seen below:
+      
+      Example <EvaluateFile> Metric Based File Output:
+          Epoch	Loss	Accuracy	Precision	Recall	Matthews_Correlation
+          0	0.10790298134088516	0.27450981736183167	0.6086956262588501	0.5400000214576721	0.6931508779525757
+          1	0.09702833741903305	0.26923078298568726	0.6086956262588501	0.5300000309944153	0.6928690671920776
+          2	0.03856460377573967	0.24528302252292633	0.5652173757553101	0.5	0.6959676742553711
+          3	...
+          n   0.2028554230928421	0.37037035822868347	0.43478259444236755	0.699999988079071	0.6662446856498718
+      
+      Note: This parameter depends on <EvaluateFile> to be specified and valid otherwise no testing metrics will be computed.
+            Specifying this parameter will result in increased training times during network training.
+    
+    
     <EvaluateFile>          -> Evaluation File (Must Be In Same Format As <TrainFile>)
     
-      Network metric output is based on a batch-by-batch basis by default. Setting this parameter to a evaluation file will load that evaluation
-      data into memory and generate evaluation cui input, predicate input and cui output matrices for the evaluation file using the specified
-      cui and predicate vector files (if any are specified). When a training statistics file path is also specified with this parameter, network
-      metrics will be computed per epoch against the evaluation dataset and saved to the training statistics file.
+      Setting this parameter to a evaluation file will load that evaluation data into memory and generate evaluation cui input, predicate input
+      and cui output matrices for the evaluation file using the specified cui and predicate vector files (if any are specified). When a testing
+      statistics file path is also specified with this parameter, network metrics will be computed per epoch against the evaluation dataset and
+      saved to the testing statistics file.
       
-      Ex: <EvaluateFile> = "cui_mini_eval" and <TrainingStatsFile> = "training_stats_file.txt". Contents of the training stats file can be seen in
+      Ex: <EvaluateFile> = "cui_mini_eval" and <TestingStatsFile> = "testing_stats_file.txt". Contents of the training stats file can be seen in
           the form:
               Epoch	Loss	Accuracy	Precision	Recall	Matthews_Correlation
               0	0.8800889849662781	0.10000000149011612	0.145454540848732	0.42105263471603394	-0.12553337216377258
@@ -279,26 +332,12 @@
               9	0.8763140439987183	0.10000000149011612	0.21212121844291687	0.3684210479259491	0.03957393020391464
               10	0.8756741285324097	0.10000000149011612	0.22580644488334656	0.3684210479259491	0.06117841973900795
       
-      Note: Generating statistics based on the evaluation file depends on specifying <TrainingStatsFile> and <EvaluateFile> Parameters. If both of
-            these are not specified, the network will continue to calculate statistics based on a batch-by-batch basis, not displaying representative
-            data based on the entire dataset.
-            
-      Data Generated Batch-By-Batch Will Be Displayed As Shown Below (Note how the two are named/categorized differently):
-              epoch	Matthews_Correlation	Precision	Recall	acc	loss
-              0	0.07128726691007614	0.25999999046325684	0.5652173757553101	0.10000000149011612	0.8585349321365356
-              1	0.023762421682476997	0.23999999463558197	0.52173912525177	0.10000000149011612	0.860185444355011
-              2	-0.07881104201078415	0.20000000298023224	0.47826087474823	0.10000000149011612	0.8608811497688293
-              3	-0.03470007702708244	0.21568627655506134	0.47826087474823	0.0	0.8594555854797363
-              4	0.08223442733287811	0.26530611515045166	0.5652173757553101	0.20000000298023224	0.8581691980361938
-              5	-0.0276530422270298	0.21739129722118378	0.43478259444236755	0.0	0.8597105145454407
-              6	-0.0019025164656341076	0.2291666716337204	0.47826087474823	0.0	0.8597526550292969
-              7	-0.005744492169469595	0.22727273404598236	0.43478259444236755	0.30000001192092896	0.8575164079666138
-              8	0.12416692078113556	0.2926829159259796	0.52173912525177	0.20000000298023224	0.8560946583747864
-              9	0.016369333490729332	0.2380952388048172	0.43478259444236755	0.20000000298023224	0.8569968938827515
-              10	0.1346537321805954	0.3055555522441864	0.47826087474823	0.10000000149011612	0.8561884164810181
+      Note: Generating statistics based on the evaluation file depends on specifying <TestingStatsFile> and <EvaluateFile> Parameters. If both of
+            these are not specified, the network will not compute evaluation/testing statistics. In the event the <EvaluateFile> parameter is
+            specified but does not exist, the script will report and error and terminate. Specifying this parameter will result in increased
+            training times during network training.
       
       
-
 ############################################################################
 #                                                                          #
 #    Debug Configuration File Parameters (Detailed)                        #
@@ -320,21 +359,7 @@
           ProcessNeuralNetwork() - Predicting Output Given Inputs -> CUI: "C001" and Predicate: "ISA"
           ProcessNeuralNetwork() - Predicted CUI Indices: [[0.29122147 0.3247243  0.40073794 0.38012606 0.25465256 0.24141827
             0.27007547 0.32670346 0.30688864 0.33571053]]
-    
-    
-    <TrainingStatsFile>     -> File To Print Training Statistics To After Each Epoch
-    
-      This parameter can be specified as any string/filename. It will print calculated neural network
-      metrics after each epoch. An example can be seen below:
-      
-      Example File Output:
-          epoch	Matthews_Correlation	Precision	Recall	acc	loss
-          0	0.10790298134088516	0.27450981736183167	0.6086956262588501	0.5400000214576721	0.6931508779525757
-          1	0.09702833741903305	0.26923078298568726	0.6086956262588501	0.5300000309944153	0.6928690671920776
-          2	0.03856460377573967	0.24528302252292633	0.5652173757553101	0.5	0.6959676742553711
-          3	...
-          n   0.2028554230928421	0.37037035822868347	0.43478259444236755	0.699999988079071	0.6662446856498718
-    
+            
     
     <PrintNetworkInputs>    -> Prints Raw Network Input/Output Data (Matrices) Prior To Sending To The Network As Input/Expected Output
     

@@ -5,7 +5,7 @@
 #    -------------------------------------------                                           #
 #                                                                                          #
 #    Date:    10/02/2018                                                                   #
-#    Revised: 12/03/2018                                                                   #
+#    Revised: 12/10/2018                                                                   #
 #                                                                                          #
 #    Generates A Neural Network Using A Configuration File.                                #
 #      - Supports Dense and Sparse Input Vectors In All Combinations Of CUI and            #
@@ -77,6 +77,7 @@ concept_vector_file             = ""
 predicate_vector_file           = ""
 predicate_list_file             = ""
 training_stats_file             = ""
+testing_stats_file              = ""
 output_file_name                = ""
 evaluation_file                 = ""
 print_network_inputs            = 0
@@ -168,6 +169,26 @@ def CloseTrainingStatsFileHandle():
         training_stats_file.close()
         training_stats_file = ""
 
+#   Open The Testing Statistics File Handle
+def OpenTestingStatsFileHandle():
+    global testing_stats_file
+    PrintLog( "OpenTestingStatsFileHandle() - Creating and Opening Testing Stats File Handle: \"" + testing_stats_file + "\"" )
+    testing_stats_file = open( testing_stats_file, "w" )
+
+#   Write String To Testing Statistics File Handle
+def WriteStringToTestingStatsFile( string ):
+    if( testing_stats_file is not "" ):
+        PrintLog( "WriteStringToTestingStatsFile() - Writing String To File: \"" + string + "\"" )
+        testing_stats_file.write( str( string ) + "\n" )
+
+#   Close The Testing Statistics File Handle
+def CloseTestingStatsFileHandle():
+    global testing_stats_file
+    if( testing_stats_file is not "" ):
+        PrintLog( "CloseTestingStatsFileHandle() - Closing Testing Stats File Handle" )
+        testing_stats_file.close()
+        testing_stats_file = ""
+
 #   Checks To See If The Input Is In Dense Or Sparse Format
 #       False = Dense Format, True = Sparse Format
 def IsDenseVectorFormat( vector ):
@@ -198,6 +219,7 @@ def ReadConfigFile( config_file_path ):
     global number_of_epochs
     global output_file_name
     global shuffle_input_data
+    global testing_stats_file
     global concept_output_file
     global concept_vector_file
     global predicate_list_file
@@ -232,9 +254,9 @@ def ReadConfigFile( config_file_path ):
 
     # Set Network Parameters Using Config File Data
     for line in f1:
-        line = re.sub( r'<|>|\n', '', line )
+        line = re.sub( r'<|>|\n', '', line.strip() )
         data = line.split( ":" )
-
+        
         if data[0] == "DebugLog"                : debug_log                       = int( data[1] )
         if data[0] == "WriteLog"                : write_log                       = int( data[1] )
         if data[0] == "Momentum"                : momentum                        = float( data[1] )
@@ -255,6 +277,7 @@ def ReadConfigFile( config_file_path ):
         if data[0] == "PredicateVectorFile"     : predicate_vector_file           = str( data[1] )
         if data[0] == "PredicateListFile"       : predicate_list_file             = str( data[1] )
         if data[0] == "TrainingStatsFile"       : training_stats_file             = str( data[1] )
+        if data[0] == "TestingStatsFile"        : testing_stats_file              = str( data[1] )
         if data[0] == "PrintNetworkInputs"      : print_network_inputs            = int( data[1] )
         if data[0] == "PrintMatrixStats"        : print_matrix_generation_stats   = int( data[1] )
         if data[0] == "AdjustVectors"           : adjust_for_unidentified_vectors = int( data[1] )
@@ -292,9 +315,17 @@ def ReadConfigFile( config_file_path ):
     if( weight_dump_interval >= number_of_epochs ):
         PrintLog( "ReadConfigFile() - Warning: Weight Dump Interval Parameter >= Number Of Epochs / Setting Weight Dump Interval = 0", 1 )
         weight_dump_interval = 0
-    if( evaluation_file is "" ):
-        PrintLog( "ReadConfigFile() - Warning: Evaluation File Is Not Specified / Training Metrics Will Be Calulated On A Batch-By-Batch Basis", 1 )
-    
+    if( training_stats_file == "" ):
+        PrintLog( "ReadConfigFile() - Warning: Training Stats File Not Specified / Training Metrics Will Computed And Reported On A Batch-Basis", 1 )
+    if( testing_stats_file is "" or evaluation_file is "" ):
+        PrintLog( "ReadConfigFile() - Warning: Testing Stats File/Evaluation File Is Not Specified / Testing Metrics Will Not Be Reported", 1 )
+    if( concept_vector_file != "" and CheckIfFileExists( concept_vector_file ) == False ):
+        PrintLog( "ReadConfigFile() - Error: Concept Vector File - \"" + str( concept_vector_file ) + "\" Does Not Exist", 1 )
+    if( predicate_vector_file != "" and CheckIfFileExists( predicate_vector_file ) == False ):
+        PrintLog( "ReadConfigFile() - Error: Predicate Vector File - \"" + str( predicate_vector_file ) + "\" Does Not Exist", 1 )
+    if( ( concept_vector_file != "" and CheckIfFileExists( concept_vector_file ) == False )
+        or ( predicate_vector_file != "" and CheckIfFileExists( predicate_vector_file ) == False ) ):
+        exit()
 
     if( trainable_dense_embeddings is 1 ): trainable_dense_embeddings = True
     else:                                  trainable_dense_embeddings = False
@@ -322,6 +353,7 @@ def ReadConfigFile( config_file_path ):
     PrintLog( "    Predicate Vector File      : " + str( predicate_vector_file ) )
     PrintLog( "    Predicate List File        : " + str( predicate_list_file ) )
     PrintLog( "    Training Stats File        : " + str( training_stats_file ) )
+    PrintLog( "    Testing Stats File         : " + str( testing_stats_file ) )
     PrintLog( "    Evaluation File            : " + str( evaluation_file ) )
     PrintLog( "    Output File Name           : " + str( output_file_name ) )
     PrintLog( "    Batch Size                 : " + str( batch_size ) )
@@ -1032,15 +1064,15 @@ def GetConceptUniqueIdentifierData():
         
         PrintLog( "GetConceptUniqueIdentifierData() - Evaluation File Data Length: " + str( len( evaluation_data ) ) )
         
-        if( len( evaluation_data ) == 0 or training_stats_file == "" ):
-            PrintLog( "GetConceptUniqueIdentifierData() - Warning: Evaluation File Could Not Be Loaded Or Training Statistics File Is Empty String", 1 )
-            PrintLog( "GetConceptUniqueIdentifierData() -          Training Statistics/Metrics Will Print Based On Current Batch" )
+        if( len( evaluation_data ) == 0 or testing_stats_file == "" ):
+            PrintLog( "GetConceptUniqueIdentifierData() - Warning: Evaluation File Could Not Be Loaded Or Testing Statistics File Is Empty String", 1 )
+            PrintLog( "GetConceptUniqueIdentifierData() -          Testing Metrics Will Not Be Computed" )
             process_eval_metrics_per_epoch = 0
         else:
             process_eval_metrics_per_epoch = 1
             
     else:
-        PrintLog( "GetConceptUniqueIdentifierData() - Warning: No Evaluation File Specified" )
+        PrintLog( "GetConceptUniqueIdentifierData() - Warning: No Evaluation File Specified / Testing Metrics Will Not Be Computed" )
         process_eval_metrics_per_epoch = 0
     
 
@@ -1738,8 +1770,8 @@ def TrainNeuralNetwork( neural_network_model = None, initial_epoch = None, conce
     # Train The Model On The Inputs/Output
     PrintLog( "TrainNeuralNetwork() - Begin Model Training" )
     
-    if( training_stats_file != "" and process_eval_metrics_per_epoch is 0 ):
-        csv_logger = CSVLogger( training_stats_file, append = True, separator = '\t')
+    if( training_stats_file == "" ):
+        csv_logger = CSVLogger( output_file_name + "_training_stats.txt", append = True, separator = '\t')
         neural_network_model.fit( [concept_input, predicate_input], concept_output, callbacks = [csv_logger], shuffle = shuffle_input_data, initial_epoch = initial_epoch, epochs = initial_epoch + 1 )
     else:
         neural_network_model.fit( [concept_input, predicate_input], concept_output, shuffle = shuffle_input_data, initial_epoch = initial_epoch, epochs = initial_epoch + 1 )
@@ -1902,21 +1934,35 @@ def NetworkPredictOutput( model, cui_input, predicate_input ):
 def ProcessNeuralNetwork():
     global curr_training_data_index
     
-    eval_cui_input_matrix       = None
-    eval_cui_output_matrix      = None
-    training_stats_file_handle  = None
-    eval_predicate_input_matrix = None
+    eval_cui_input_matrix        = None
+    eval_cui_output_matrix       = None
+    train_cui_input_matrix       = None
+    train_cui_output_matrix      = None
+    training_stats_file_handle   = None
+    eval_predicate_input_matrix  = None
+    train_predicate_input_matrix = None
     
     # Train The Neural Network Using Specified Input/Output Matrices
     PrintLog( "ProcessNeuralNetwork() - Generating Actual Neural Network" )
     model = GenerateNeuralNetwork()
     PrintLog( "ProcessNeuralNetwork() - Finished Generating Neural Network" )
     
-    if( process_eval_metrics_per_epoch is 1 ):
+    # Generating File Handle and Matrices For Complete Training Metrics Per Epoch
+    if( training_stats_file != "" ):
         PrintLog( "ProcessNeuralNetwork() - Creating Training Statistics File" )
         OpenTrainingStatsFileHandle()
         
         WriteStringToTrainingStatsFile( "Epoch\tLoss\tAccuracy\tPrecision\tRecall\tMatthews_Correlation" )
+        
+        PrintLog( "ProcessNeuralNetwork() - Generating Training CUI Input, Predicate Input and CUI Output Matrices/Sequences" )
+        train_cui_input_matrix, train_predicate_input_matrix, train_cui_output_matrix = GenerateNetworkData()
+    
+    # Generating File Handle and Matrices For Complete Testing Metrics Per Epoch
+    if( process_eval_metrics_per_epoch is 1 ):
+        PrintLog( "ProcessNeuralNetwork() - Creating Testing Statistics File" )
+        OpenTestingStatsFileHandle()
+        
+        WriteStringToTestingStatsFile( "Epoch\tLoss\tAccuracy\tPrecision\tRecall\tMatthews_Correlation" )
         
         PrintLog( "ProcessNeuralNetwork() - Generating Evaluation CUI Input, Predicate Input and CUI Output Matrices/Sequences" )
         eval_cui_input_matrix, eval_predicate_input_matrix, eval_cui_output_matrix = GenerateNetworkData( evaluation_data )
@@ -1957,25 +2003,45 @@ def ProcessNeuralNetwork():
                     model.save_weights( output_file_name + "_epoch_" + str( curr_epoch ) + "_model_weights.h5" )
                     weight_dump_counter = 0
         
-        # Training Statistics Based On Evaluation File
-        if( process_eval_metrics_per_epoch is 1 ):
-            PrintLog( "ProcessNeuralNetwork() - Evaluating Current Network Using Evaluation Data" )
-            loss, accuracy, precision, recall, matthews_correlation = model.evaluate( [ eval_cui_input_matrix, eval_predicate_input_matrix ], eval_cui_output_matrix )
+        # Compute Training Statistics Based On The Entire Training Dataset
+        if( training_stats_file != "" ):
+            PrintLog( "ProcessNeuralNetwork() - Evaluating Current Network Using Training Evaluation Data" )
+            loss, accuracy, precision, recall, matthews_correlation = model.evaluate( [ train_cui_input_matrix, train_predicate_input_matrix ], train_cui_output_matrix )
             
             PrintLog( "ProcessNeuralNetwork() - Epoch " + str( curr_epoch ) + " - Complete Metrics: Loss: " + str( loss )
                      + "\tAccuracy: " + str( accuracy ) + "\tPrecision: " + str( precision ) + "\tRecall: " + str( recall )
                      + "\tMatthews_Correlation: " + str( matthews_correlation ) )
             WriteStringToTrainingStatsFile( str( curr_epoch ) + "\t" + str( loss ) + "\t" + str( accuracy ) + "\t"
                                            + str( precision ) + "\t" + str( recall ) + "\t" + str( matthews_correlation ) )
-        
-    if( process_eval_metrics_per_epoch is 1 ):
-        PrintLog( "ProcessNeuralNetwork() - Closing Training Statistics File" )
+    
+        # Compute Testing Statistics Based On Evaluation File
+        if( process_eval_metrics_per_epoch is 1 ):
+            PrintLog( "ProcessNeuralNetwork() - Evaluating Current Network Using Testing Evaluation Data" )
+            loss, accuracy, precision, recall, matthews_correlation = model.evaluate( [ eval_cui_input_matrix, eval_predicate_input_matrix ], eval_cui_output_matrix )
+            
+            PrintLog( "ProcessNeuralNetwork() - Epoch " + str( curr_epoch ) + " - Complete Metrics: Loss: " + str( loss )
+                     + "\tAccuracy: " + str( accuracy ) + "\tPrecision: " + str( precision ) + "\tRecall: " + str( recall )
+                     + "\tMatthews_Correlation: " + str( matthews_correlation ) )
+            WriteStringToTestingStatsFile( str( curr_epoch ) + "\t" + str( loss ) + "\t" + str( accuracy ) + "\t"
+                                           + str( precision ) + "\t" + str( recall ) + "\t" + str( matthews_correlation ) )
+    
+    # Clean Up Training Statistics Variables
+    if( training_stats_file != "" ):
+        PrintLog( "ProcessNeuralNetwork() - Cleaning Up Training Statistics Variables" )
         CloseTrainingStatsFileHandle()
+        train_cui_input_matrix       = None
+        train_predicate_input_matrix = None
+        train_cui_ouput_matrix       = None
+        
+    # Clean Up Testing Statistics Variables
+    if( process_eval_metrics_per_epoch is 1 ):
+        PrintLog( "ProcessNeuralNetwork() - Cleaning Up Testing Statistics Variables" )
+        CloseTestingStatsFileHandle()
         eval_cui_input_matrix       = None
         eval_predicate_input_matrix = None
         eval_cui_output_matrix      = None
 
-    PrintLog( "ProcessNeuralNetwork() - Training Time: %s secs" % ( time.time() - start_time ) )
+    PrintLog( "ProcessNeuralNetwork() - Training Time: %s secs" % ( time.time() - start_time ), 1 )
 
     # Save Network Model
     PrintLog( "ProcessNeuralNetwork() - Saving Model: \"" + output_file_name + "_model.h5\"", 1 )
