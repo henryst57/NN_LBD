@@ -238,18 +238,22 @@
     
       Ex: <OutputFileName> = "cui_mini_sparse"
           Network Output File Names:
+              - cui_mini_sparse.cui_key
               - cui_mini_sparse_model.h5
+              - cui_mini_sparse.predicate_key
+              - cui_mini_sparse_model_visual.png
               - cui_mini_sparse_model_weights.h5
               - cui_mini_sparse_model_architecture.json
-              - cui_mini_sparse_model_visual.png
       
-      Not specifiying this variable will default to "trained_nn".
+      Not specifying this variable will default to "trained_nn".
       
       ie. Network Output Files Names:
+              - trained_nn.cui_key
               - trained_nn_model.h5
+              - trained_nn.predicate_key
+              - trained_nn_model_visual.png
               - trained_nn_model_weights.h5
               - trained_nn_model_architecture.json
-              - trained_nn_model_visual.png
     
     
     <WeightDumpInterval>    -> Dumps Network Weights Based User Specified Setting

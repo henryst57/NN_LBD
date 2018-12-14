@@ -5,7 +5,7 @@
 #    -------------------------------------------                                           #
 #                                                                                          #
 #    Date:    10/02/2018                                                                   #
-#    Revised: 12/10/2018                                                                   #
+#    Revised: 12/12/2018                                                                   #
 #                                                                                          #
 #    Generates A Neural Network Using A Configuration File.                                #
 #      - Supports Dense and Sparse Input Vectors In All Combinations Of CUI and            #
@@ -1173,10 +1173,18 @@ def GetConceptUniqueIdentifierData():
 #   Print CUI and Predicate Key Files
 def PrintKeyFiles():
     if( print_key_files is 1 ):
+        output_name = ""
+        
+        # Get Output File Name
+        if( output_file_name != "" ):
+            PrintLog( "PrintKeyFiles() - Grabbing Output File Output File Name Variable" )
+            output_name = output_file_name
         # Get Train File Name From Path
-        output_name = train_file.split( "/" )
-        if( len( output_name ) == 1 ): output_name = train_file.split( "\\" )
-        output_name = output_name[-1]
+        else:
+            PrintLog( "PrintKeyFiles() - Grabbing Output File Output File Name From Train File" )
+            output_name = train_file.split( "/" )
+            if( len( output_name ) == 1 ): output_name = train_file.split( "\\" )
+            output_name = output_name[-1]
         
         PrintLog( "PrintKeyFiles() - Key File Printing Enabled" )
         PrintLog( "PrintKeyFiles() - Printing CUI Key File: " + output_name + ".cui_key" )
