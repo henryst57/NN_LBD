@@ -61,9 +61,9 @@ sub _filterDataSet {
 	
 	#see if you should keep it, only keep lines that contain
 	# cuis that we want to keep and a predicate type we want to keep
-	if (exists $cuisToRemove{$vals[0]} 
-	    || exists $cuisToRemove{$vals[2]}
-	    || !exists $predicatesToKeep{$vals[1]}) {
+	if (!exists $cuisToRemove{$vals[0]} 
+	    && !exists $cuisToRemove{$vals[2]}
+	    && exists $predicatesToKeep{$vals[1]}) {
 	    print OUT "$line"
 	}
     }

@@ -80,8 +80,12 @@ sub _createTestTrain {
         if (defined ${$vocabularyRef}{$subject} 
 	    && defined ${$vocabularyRef}{$object}
 	    && defined ${$predicateTypesRef}{$relType}) {
-	    $trueTriplets{$triplet}=1;
-	}
+	
+            #check that it is not already known
+	    if (!defined $knownTriplets{$triplet}) {
+                $trueTriplets{$triplet}=1;
+	    }
+	} 
     }
 
 =comment
