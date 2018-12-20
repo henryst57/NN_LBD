@@ -112,6 +112,7 @@ for my $root_folder_name ( keys %configurations )
     GenerateConfigurationFile( $root_folder_name, "MOMENTUM",  "M_0.7",        $learning_rate, 0.7,       $dropout_amt, $batch_size );
     GenerateConfigurationFile( $root_folder_name, "MOMENTUM",  "M_0.9",        $learning_rate, 0.9,       $dropout_amt, $batch_size );
 }
+
 PrintLog( "~Fin", 1 );
 
 
