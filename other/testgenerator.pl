@@ -2,6 +2,12 @@
 ##########################################################################
 #                                                                        #
 #    NNLBD Test Config Generator And Executor                            #
+#                                                                        #
+#     Usage: Set Vector File Paths, then "perl testgenerator.pl"         #
+#            It will create folders that categorizes all testing         #
+#            scenarios and execute TrainNN on the generated config       #
+#            files in each path.                                         #
+#                                                                        #
 #                              ~ Statler                                 #
 #                                                                        #
 ##########################################################################
@@ -17,8 +23,13 @@ use warnings;
 ##########################################################################
 #  ( Used In GenerateConfigurationFile() Function )
 
+# Default Training Parameter Values
 my $debug_log             = 0;
 my $write_log             = 0;
+my $learning_rate         = 0.7;
+my $momentum              = 0.9;
+my $dropout_amt           = 0.25;
+my $batch_size            = 200;
 my $layer_1_size          = 200;
 my $layer_2_size          = 400;
 my $print_key_files       = 1;
@@ -28,46 +39,36 @@ my $trainNN_path          = "/home/charityml/git_NN_LBD/NN_LBD/NN/trainNN/trainN
 my $training_file         = "/home/share/NN_LBD/data/testTrain/known_1000";
 my $evaluation_file       = "/home/share/NN_LBD/data/testTrain/true_1000";
 my $concept_vector_file   = "/home/share/NN_LBD/data/vectors/vectors_random_cuis";
-my $predicate_vector_file = "/home/share/NN_LBD/data/vectors/vectors_random_predicates";
-
-#set the default values
-my $def_lr = 0.7;
-my $def_m = 0.9;
-my $def_damt = 0.25;
-my $def_bs = 200;
+my $predicate_vector_file = "/home/share/NN_LBD/data/vectors/vectors_onehot_predicates";
 
 
-$SIG{'INT'} = sub {PrintLog("EXITING PROGRAM"); exit;}; #catch kill to terminate for good (not just python)
+$SIG{'INT'} = sub { PrintLog( "EXITING PROGRAM" ); exit; }; # catch kill to terminate for good (not just python)
 
 PrintLog( "Generating Configuration File(s)" );
 
-mkdir "LEARNRATE";
-mkdir "BATCHSIZE";
-mkdir "DROPOUT";
-mkdir "MOMENTUM";
-
-GenerateConfigurationFile( "LEARNRATE", "LR_0.1", 0.1, $def_m, $def_damt, $def_bs );
-GenerateConfigurationFile( "LEARNRATE", "LR_0.3", 0.3, $def_m, $def_damt, $def_bs );
-GenerateConfigurationFile( "LEARNRATE", "LR_0.5", 0.5, $def_m, $def_damt, $def_bs );
-GenerateConfigurationFile( "LEARNRATE", "LR_0.7", 0.7, $def_m, $def_damt, $def_bs );
-GenerateConfigurationFile( "LEARNRATE", "LR_0.9", 0.9, $def_m, $def_damt, $def_bs );
-GenerateConfigurationFile( "BATCHSIZE", "BS_1", $def_lr, $def_m, $def_damt, 1 );
-GenerateConfigurationFile( "BATCHSIZE", "BS_50", $def_lr, $def_m, $def_damt, 50 );
-GenerateConfigurationFile( "BATCHSIZE", "BS_100", $def_lr, $def_m, $def_damt, 100 );
-GenerateConfigurationFile( "BATCHSIZE", "BS_200", $def_lr, $def_m, $def_damt, 200 );
-GenerateConfigurationFile( "BATCHSIZE", "BS_500", $def_lr, $def_m, $def_damt, 500 );
-GenerateConfigurationFile( "BATCHSIZE", "BS_999999999", $def_lr, $def_m, $def_damt, 999999999 );
-GenerateConfigurationFile( "DROPOUT", "DAMT_0.0", $def_lr, $def_m, 0.0, $def_bs );
-GenerateConfigurationFile( "DROPOUT", "DAMT_0.1", $def_lr, $def_m, 0.1, $def_bs );
-GenerateConfigurationFile( "DROPOUT", "DAMT_0.3", $def_lr, $def_m, 0.3, $def_bs );
-GenerateConfigurationFile( "DROPOUT", "DAMT_0.5", $def_lr, $def_m, 0.5, $def_bs );
-GenerateConfigurationFile( "DROPOUT", "DAMT_0.7", $def_lr, $def_m, 0.7, $def_bs );
-GenerateConfigurationFile( "DROPOUT", "DAMT_0.9", $def_lr, $def_m, 0.9, $def_bs );
-GenerateConfigurationFile( "MOMENTUM", "M_0.1", $def_lr, 0.1, $def_damt, $def_bs );
-GenerateConfigurationFile( "MOMENTUM", "M_0.3", $def_lr, 0.3, $def_damt, $def_bs );
-GenerateConfigurationFile( "MOMENTUM", "M_0.5", $def_lr, 0.5, $def_damt, $def_bs );
-GenerateConfigurationFile( "MOMENTUM", "M_0.7", $def_lr, 0.7, $def_damt, $def_bs );
-GenerateConfigurationFile( "MOMENTUM", "M_0.9", $def_lr, 0.9, $def_damt, $def_bs );
+# One-Hot Tests
+GenerateConfigurationFile( "LEARNRATE", "LR_0.1",       0.1,            $momentum, $dropout_amt, $batch_size );
+GenerateConfigurationFile( "LEARNRATE", "LR_0.3",       0.3,            $momentum, $dropout_amt, $batch_size );
+GenerateConfigurationFile( "LEARNRATE", "LR_0.5",       0.5,            $momentum, $dropout_amt, $batch_size );
+GenerateConfigurationFile( "LEARNRATE", "LR_0.7",       0.7,            $momentum, $dropout_amt, $batch_size );
+GenerateConfigurationFile( "LEARNRATE", "LR_0.9",       0.9,            $momentum, $dropout_amt, $batch_size );
+GenerateConfigurationFile( "BATCHSIZE", "BS_1",         $learning_rate, $momentum, $dropout_amt, 1           );
+GenerateConfigurationFile( "BATCHSIZE", "BS_50",        $learning_rate, $momentum, $dropout_amt, 50          );
+GenerateConfigurationFile( "BATCHSIZE", "BS_100",       $learning_rate, $momentum, $dropout_amt, 100         );
+GenerateConfigurationFile( "BATCHSIZE", "BS_200",       $learning_rate, $momentum, $dropout_amt, 200         );
+GenerateConfigurationFile( "BATCHSIZE", "BS_500",       $learning_rate, $momentum, $dropout_amt, 500         );
+GenerateConfigurationFile( "BATCHSIZE", "BS_999999999", $learning_rate, $momentum, $dropout_amt, 999999999   );
+GenerateConfigurationFile( "DROPOUT",   "DAMT_0.0",     $learning_rate, $momentum, 0.0,          $batch_size );
+GenerateConfigurationFile( "DROPOUT",   "DAMT_0.1",     $learning_rate, $momentum, 0.1,          $batch_size );
+GenerateConfigurationFile( "DROPOUT",   "DAMT_0.3",     $learning_rate, $momentum, 0.3,          $batch_size );
+GenerateConfigurationFile( "DROPOUT",   "DAMT_0.5",     $learning_rate, $momentum, 0.5,          $batch_size );
+GenerateConfigurationFile( "DROPOUT",   "DAMT_0.7",     $learning_rate, $momentum, 0.7,          $batch_size );
+GenerateConfigurationFile( "DROPOUT",   "DAMT_0.9",     $learning_rate, $momentum, 0.9,          $batch_size );
+GenerateConfigurationFile( "MOMENTUM",  "M_0.1",        $learning_rate, 0.1,       $dropout_amt, $batch_size );
+GenerateConfigurationFile( "MOMENTUM",  "M_0.3",        $learning_rate, 0.3,       $dropout_amt, $batch_size );
+GenerateConfigurationFile( "MOMENTUM",  "M_0.5",        $learning_rate, 0.5,       $dropout_amt, $batch_size );
+GenerateConfigurationFile( "MOMENTUM",  "M_0.7",        $learning_rate, 0.7,       $dropout_amt, $batch_size );
+GenerateConfigurationFile( "MOMENTUM",  "M_0.9",        $learning_rate, 0.9,       $dropout_amt, $batch_size );
 
 PrintLog( "~Fin", 1 );
 
@@ -121,11 +122,12 @@ sub CloseFile
 sub GenerateConfigurationFile
 {
     # Configuration Variables
-    my ($superfoldername, $label, $learning_rate, $momentum, $dropout_amt, $batch_size ) = @_;
+    my ( $super_folder_name, $label, $learning_rate, $momentum, $dropout_amt, $batch_size ) = @_;
     
-    my $folder_name = "$superfoldername/$label";
+    my $folder_name = "$super_folder_name/$label";
     my $file_name   = "$label" . ".cfg";
     
+    mkdir( "$super_folder_name" );
     mkdir( "$folder_name" );
     
     my $result      = 0;
@@ -195,9 +197,7 @@ sub ExecuteTraining
     else
     {
         PrintLog( "ExecutingTraining() - Executing NNLBD using Config File: $file_name" );
-        my $finishCode = system( "$python_exec_path \"$trainNN_path\" \"$file_name\"" );
-	#if($finishCode == 0){exit(1);}   //tries to close if interrupted with Ctrl-C
-        return 0;
+        return system( "$python_exec_path \"$trainNN_path\" \"$file_name\"" );
     }
     
     PrintLog( "ExecuteTraining() - Error Detected: See Above For Further Information" );

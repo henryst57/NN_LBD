@@ -5,7 +5,7 @@
 #    -------------------------------------------                                           #
 #                                                                                          #
 #    Date:    10/02/2018                                                                   #
-#    Revised: 12/12/2018                                                                   #
+#    Revised: 12/19/2018                                                                   #
 #                                                                                          #
 #    Generates A Neural Network Using A Configuration File.                                #
 #      - Supports Dense and Sparse Input Vectors In All Combinations Of CUI and            #
@@ -1766,6 +1766,7 @@ def TrainNeuralNetwork( neural_network_model = None, initial_epoch = None, conce
     if( concept_output is None ):
         PrintLog( "TrainNeuralNetwork() - Error: Concept Output Contains No Data", 1 )
     if( neural_network_model is None or concept_input is None or predicate_input is None or concept_output is None ):
+        PrintLog( "TrainNeuralNetwork() - Empty Input(s) or Output Matrices / No Training Completed" )
         return -1
     
     if( initial_epoch is None ):
@@ -1975,11 +1976,13 @@ def ProcessNeuralNetwork():
         PrintLog( "ProcessNeuralNetwork() - Generating Evaluation CUI Input, Predicate Input and CUI Output Matrices/Sequences" )
         eval_cui_input_matrix, eval_predicate_input_matrix, eval_cui_output_matrix = GenerateNetworkData( evaluation_data )
     
+    # Network Runtime Variables
     start_time                   = time.time()
     weight_dump_counter          = weight_dump_interval
     curr_training_data_index     = 0
     number_of_remaining_elements = train_file_data_length
     
+    # Train The Network Using Training Data
     for curr_epoch in range( number_of_epochs ):
         while( number_of_remaining_elements > 0 ):
             PrintLog( "ProcessNeuralNetwork() - Current Epoch: " + str( curr_epoch ) + "/" + str( number_of_epochs ) )
