@@ -44,8 +44,8 @@ my $print_key_files       = 1;
 my $number_of_epochs      = 1;
 my $python_exec_path      = "python";           # python or python3
 my $trainNN_path          = "trainNN.py";       # If TrainNN.py is in a different path than working directory
-my $training_file         = "data/known_10000";
-my $evaluation_file       = "data/true_10000";
+my $training_file         = "/home/share/NN_LBD/data/testTrain/known_10000";
+my $evaluation_file       = "/home/share/NN_LBD/data/testTrain/true_10000";
 
 # Vector File Paths (Edit Me)
 my $onehot_concept_vector_file   = "/home/share/NN_LBD/data/vectors/vectors_onehot_cuis_new";
