@@ -53,7 +53,7 @@ my $onehot_predicate_vector_file = "/home/share/NN_LBD/data/vectors/vectors_oneh
 my $random_concept_vector_file   = "/home/share/NN_LBD/data/vectors/vectors_random_cuis";
 my $random_predicate_vector_file = "/home/share/NN_LBD/data/vectors/vectors_random_predicates";
 my $w2v_concept_vector_file      = "/home/share/NN_LBD/data/vectors/vectors_word2vec_1975_2009_abstractCuis_window8_size200_min-count0_cbow";
-my $w2v_predicate_vector_file    = ""; # "/home/share/NN_LBD/data/vectors/smdb.allpredicate.s1.mc0.bin";  # This file also contains cuis too. They must be removed first.
+my $w2v_predicate_vector_file    = "/home/share/NN_LBD/data/vectors/smdb.allpredicate.s1.mc0.bin_new"; 
 
 
 $SIG{'INT'} = sub { PrintLog( "EXITING PROGRAM" ); exit; }; # catch kill to terminate for good (not just python)
