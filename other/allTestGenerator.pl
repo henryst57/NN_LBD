@@ -44,16 +44,16 @@ my $print_key_files       = 1;
 my $number_of_epochs      = 1;
 my $python_exec_path      = "python";           # python or python3
 my $trainNN_path          = "trainNN.py";       # If TrainNN.py is in a different path than working directory
-my $training_file         = "data/known_1000";
-my $evaluation_file       = "data/true_1000";
+my $training_file         = "data/known_10000";
+my $evaluation_file       = "data/true_10000";
 
 # Vector File Paths (Edit Me)
-my $onehot_concept_vector_file   = "/home/share/NN_LBD/data/vectors/vectors_onehot_cuis";
-my $onehot_predicate_vector_file = "/home/share/NN_LBD/data/vectors/vectors_onehot_predicates";
+my $onehot_concept_vector_file   = "/home/share/NN_LBD/data/vectors/vectors_onehot_cuis_new";
+my $onehot_predicate_vector_file = "/home/share/NN_LBD/data/vectors/vectors_onehot_predicates_new";
 my $random_concept_vector_file   = "/home/share/NN_LBD/data/vectors/vectors_random_cuis";
 my $random_predicate_vector_file = "/home/share/NN_LBD/data/vectors/vectors_random_predicates";
 my $w2v_concept_vector_file      = "/home/share/NN_LBD/data/vectors/vectors_word2vec_1975_2009_abstractCuis_window8_size200_min-count0_cbow";
-my $w2v_predicate_vector_file    = "";
+my $w2v_predicate_vector_file    = ""; # "/home/share/NN_LBD/data/vectors/smdb.allpredicate.s1.mc0.bin";  # This file also contains cuis too. They must be removed first.
 
 
 $SIG{'INT'} = sub { PrintLog( "EXITING PROGRAM" ); exit; }; # catch kill to terminate for good (not just python)
