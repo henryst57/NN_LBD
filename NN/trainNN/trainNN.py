@@ -1239,12 +1239,17 @@ def PrintKeyFiles():
     return 0
 
 #   Custom Binary Cross Entropy With Logits Option
+#   The Keras Implementation appears to be incorrect
 def BCE( y_pred, y_true ):
-  return K.binary_crossentropy( y_pred, y_true, from_logits = True )
+    #apply sigmoid squashing function to predicted output. Only needed if output is not already probailities (from Logit)
+    y_pred = K.sigmoid(y_pred);
+    #Ensure values are between 0 and 1
+    y_pred = K.clip(y_pred, 0, 1.0);
 
-#   Custom Categorical Cross Entropy With Logits Option
-def CCE( y_pred, y_true ):
-  return K.categorical_crossentropy( y_pred, y_true, from_logits = True )
+    #calculate BCE
+    y_pred = (-y_true * K.log(y_pred)) - ((1.0 - y_true) * K.log(1.0 - y_pred));
+    return y_pred;
+
 
 #   Custom Metric for Precision
 """ Precision metric.
