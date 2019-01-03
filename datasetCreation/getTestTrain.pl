@@ -6,14 +6,16 @@ use warnings;
 
 
 #add the desired semantic types to the list of acceptable predicates
-my $preOutFile = 'known';
-my $goldOutFile = 'true';
+my $preOutFile = 'known_newSmall';
+my $goldOutFile = 'true_newSmall';
 
 #CHEM
-my @chemTypes = ('aapp', 'antb', 'bacs', 'bodm', 'chem', 'chvf', 'chvs', 'clnd', 'elii', 'enzy', 'hops', 'horm', 'imft', 'irda', 'inch', 'nnon', 'orch', 'phsu', 'rcpt', 'vita');
+#my @chemTypes = ('aapp', 'antb', 'bacs', 'bodm', 'chem', 'chvf', 'chvs', 'clnd', 'elii', 'enzy', 'hops', 'horm', 'imft', 'irda', 'inch', 'nnon', 'orch', 'phsu', 'rcpt', 'vita');
+my @chemTypes = ('clnd', 'phsu');
 
 #DISO
-my @disoTypes = ('acab', 'anab', 'comd', 'cgab', 'dsyn', 'emod', 'fndg', 'inpo', 'mobd', 'neop', 'patf', 'sosy');
+#my @disoTypes = ('acab', 'anab', 'comd', 'cgab', 'dsyn', 'emod', 'fndg', 'inpo', 'mobd', 'neop', 'patf', 'sosy');
+my @disoTypes = ('dsyn', 'sosy');
 
 #PREDICATE types
 my @predTypes = ('ISA', 'LOCATION_OF','PART_OF','USES','CAUSES','PROCESS_OF','TREATS','DIAGNOSES','ASSOCIATED_WITH','COEXISTS_WITH','METHOD_OF','AFFECTS','INTERACTS_WITH','OCCURS_IN','PRECEDES','COMPLICATES','PREVENTS','ADMINISTERED_TO','DISRUPTS','MANIFESTATION_OF','compared_with','PREDISPOSES','AUGMENTS','higher_than','INHIBITS','lower_than','same_as','STIMULATES','CONVERTS_TO','than_as');
@@ -129,13 +131,9 @@ sub convert {
     print "      Processing\n";
     my %pYear = ();
     while(my @row = $sth->fetchrow_array()){
-	#$pmid = $row[0];
-	#$pyear = $row[1];
 	my $pmid = $row[0];
         my $year = $row[1];
 
-	#print "pmid, year = $pmid, $year";
-	
 	$pYear{$pmid} = $year;
     }
     $dbh->disconnect(); #close DB, your done with it
@@ -148,69 +146,81 @@ sub convert {
     my %preCutoffPreds = ();
     my %postCutoffPreds = ();
     foreach my $pmid (keys %predicates) {
-	my $pYear = $pYear{$pmid};
-	if (defined $pYear) {
-	    if ($pYear >= $startYear && $pYear < $cutoffYear) {
+	my $year = $pYear{$pmid};
+	if (defined $year) {
+	    if ($year >= $startYear && $year < $cutoffYear) {
 		$preCutoffPreds{$pmid} = $predicates{$pmid};
 	    }
-	    elsif ($pYear > $cutoffYear) {
-		$postCutoffPreds{$pmid} = $predicates{$pmid}
-	    };
+	    elsif ($year > $cutoffYear) {
+		$postCutoffPreds{$pmid} = $predicates{$pmid};
+	    }
 	}
     }
 
 
 ####
     print "      Compressing\n";
-    #Combine all subject predicates to a single value
+    #Combine all subject predicates pairs to a key, where the value
+    #  is a hash of objects for which it holds true
+    # also collect pre-cutoff vocab
+    # then remove out of vocab subjects and obects from post cutoff list
     my %preCutoffList = ();
+    my %preCutoffVocab = ();
     foreach my $pmid (keys %preCutoffPreds) {
 	my ($subject, $predicate, $object) = split( /\t/, $preCutoffPreds{$pmid});
+	#add the object and create a new hash if needed
 	if(!defined $preCutoffList{"$subject\t$predicate"}) {
-	    $preCutoffList{"$subject\t$predicate"} = $object;
+	    my %newHash = ();
+	    $preCutoffList{"$subject\t$predicate"} = \%newHash;
 	}
-	else {
-	    $preCutoffList{"$subject\t$predicate"} .= "\t$object";
-	}
+	${$preCutoffList{"$subject\t$predicate"}}{$object} = 1;
+	
+	#update the vocab
+	$preCutoffVocab{$subject} = 1;
+	$preCutoffVocab{$object} = 1;
     }
     my %postCutoffList = ();
     foreach my $pmid (keys %postCutoffPreds) {
 	my ($subject, $predicate, $object) = split( /\t/, $postCutoffPreds{$pmid});
-	if(!defined $postCutoffList{"$subject\t$predicate"}) {
-	    $postCutoffList{"$subject\t$predicate"} = $object;
-	}
-	else {
-	    $postCutoffList{"$subject\t$predicate"} .= "\t$object";
+	#add the predicate if both subject and object are in vocabulary
+	if (defined $preCutoffVocab{$subject} && defined $preCutoffVocab{$object}) {
+	    #add the object and create a new hash if needed
+	    if(!defined $postCutoffList{"$subject\t$predicate"}) {
+		my %newHash = ();
+		$postCutoffList{"$subject\t$predicate"} = \%newHash;
+	    }
+	    ${$postCutoffList{"$subject\t$predicate"}}{$object} = 1;
 	}
     }
 
 
 ####
     print "      Filtering\n";
-    #remove all pre-cutoff predicates from the post cutoff dataset
+    #remove all pre-cutoff predicates from the post-cutoff dataset
     my %goldPredicates = ();
-    foreach my $pair (keys %preCutoffList) {
-	if (defined $postCutoffList{$pair}) {
-	    #grab the objects list from pre and post cutoff
-	    my @preObjects = split (/\t/, $preCutoffList{$pair});
-	    my @postObjects = split (/\t/, $postCutoffList{$pair});
-	    
-	    #convert post cutoff objects to a hash
-	    my %postObjectsHash = ();
-	    foreach my $object (@postObjects) {
-		$postObjectsHash{$object} = 1;
+    foreach my $pair (keys %postCutoffList) {
+	#iterate over all objects of this subject-object pair
+	#add post cutoff objects that are not in the pre-cutoff hash
+	# to the list of gold standard objects
+	foreach my $object (keys %{$postCutoffList{$pair}}) {
+	    my $add = 0;
+	    #check if the subject-predicate pair exists
+	    if (!defined $preCutoffList{$pair}) {
+		$add = 1;
+	    }
+	    #check if the subject-predicate-object triplet exists
+	    elsif(!defined ${$preCutoffList{$pair}}{$object}) {
+		$add = 1;
 	    }
 
-	    #remove any precutoff objects from the post cutoff hash
-	    foreach my $object (@preObjects) {
-		if (!defined $postObjectsHash{$object}) {
-		    if (!defined $goldPredicates{$pair}) {
-			$goldPredicates{$pair} = $object;
-		    }
-		    else {
-			$goldPredicates{$pair} .= "\t$object";
-		    }
+	    #add the pair if needed
+	    if ($add > 0) {
+		#initialize the list if needed
+		if (!defined $goldPredicates{$pair}) {
+		    my %newHash = ();
+		    $goldPredicates{$pair} = \%newHash;
 		}
+		${$goldPredicates{$pair}}{$object} = 1;
 	    }
 	}
     }
@@ -220,8 +230,7 @@ sub convert {
     open OUT, ">$preOutFile" or die ("ERROR: unable to open preOutFile: $preOutFile\n");
     foreach my $pair (keys %preCutoffList) {
 	print OUT $pair;
-	my @objects = split (/\t/, $preCutoffList{$pair});
-	foreach my $object (@objects) {
+	foreach my $object (keys %{$preCutoffList{$pair}}) {
 	    print OUT "\t$object";
 	}
 	print OUT "\n";
@@ -232,8 +241,7 @@ sub convert {
     open OUT, ">$goldOutFile" or die ("ERROR: unable to open goldOutFile: $goldOutFile\n");
     foreach my $pair (keys %goldPredicates) {
 	print OUT $pair;
-	my @objects = split (/\t/, $goldPredicates{$pair});
-	foreach my $object (@objects) {
+	foreach my $object (keys %{$goldPredicates{$pair}}) {
 	    print OUT "\t$object";
 	}
 	print OUT "\n";
