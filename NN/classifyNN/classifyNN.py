@@ -160,7 +160,6 @@ def LoadModel():
 	#set the custom objects based on TrainNN.py's delcared functions
 	customs = {
 		'BCE': BCE,
-		'CCE': CCE,
 		'Precision': Precision,
 		'Recall' : Recall,
 		'Matthews_Correlation' : Matthews_Correlation

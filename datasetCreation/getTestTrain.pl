@@ -84,7 +84,7 @@ sub convert {
 
 #####
     #construct the query
-    my $query = "SELECT SUBJECT_CUI, PREDICATE, OBJECT_CUI, PMID FROM $database.PREDICATION WHERE (SUBJECT_SEMTYPE IN $chemTypesString AND OBJECT_SEMTYPE IN $disoTypesString) OR (SUBJECT_SEMTYPE IN $disoTypesString AND OBJECT_SEMTYPE IN $chemTypesString) AND PREDICATE IN $predTypesString AND SUBJECT_NOVELTY = \'1\' AND OBJECT_NOVELTY = \'1\'";
+    my $query = "SELECT SUBJECT_CUI, PREDICATE, OBJECT_CUI, PMID FROM $database.PREDICATION WHERE ((SUBJECT_SEMTYPE IN $chemTypesString AND OBJECT_SEMTYPE IN $disoTypesString) OR (SUBJECT_SEMTYPE IN $disoTypesString AND OBJECT_SEMTYPE IN $chemTypesString)) AND PREDICATE IN $predTypesString AND SUBJECT_NOVELTY = \'1\' AND OBJECT_NOVELTY = \'1\'";
 #    print "$query\n";
 
 #####
