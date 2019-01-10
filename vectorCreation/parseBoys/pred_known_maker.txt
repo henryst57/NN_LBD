@@ -1,0 +1,4 @@
+PREDICATE
+/home/share/NN_LBD/data/testTrain/known_newSmall_5000
+/home/share/NN_LBD/data/vectors/smdb.allpredicate.s1.mc0.bin_new
+/home/share/NN_LBD/data/vectors/vectors_w2v_predicate_newSmall_5000_known

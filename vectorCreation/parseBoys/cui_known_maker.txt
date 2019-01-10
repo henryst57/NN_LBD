@@ -1,0 +1,4 @@
+CUI
+/home/share/NN_LBD/data/testTrain/known_newSmall_5000
+/home/share/NN_LBD/data/vectors/vectors_word2vec_1975_2009_abstractCuis_window8_size200_min-count0_cbow
+/home/share/NN_LBD/data/vectors/vectors_w2v_cuis_newSmall_5000_known
