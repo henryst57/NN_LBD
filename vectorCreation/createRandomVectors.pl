@@ -17,11 +17,11 @@ use utilities;
 #  User Input
 ############################################################
 #matrix file containing all words in the current vocabulary
-my $trainingFile = '../../data/testTrain/known';
+my $trainingFile = '../../data/testTrain/known_newSmall';
 
 #file to output the random vectors to
-my $cuiOutFile = '../../data/vectors/vectors_random_cuis';
-my $predOutFile = '../../data/vectors/vectors_random_predicates';
+my $cuiOutFile = 'vectors_random_cuis';
+my $predOutFile = 'vectors_random_predicates';
     
 #vector sizes
 my $cuiVectorSize = 200;

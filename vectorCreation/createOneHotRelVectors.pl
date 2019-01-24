@@ -1,7 +1,7 @@
 #!/bin/perl
 use strict;
 use warnings;
-use lib '/home/share/NN_LBD_NEW/code';
+use lib '../';
 require utilities;	#import the utilities.pm module
 
 #TODO - read in semmedDB and create one hot vectors for each relation type

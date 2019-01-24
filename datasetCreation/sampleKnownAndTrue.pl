@@ -6,13 +6,13 @@ use lib '../';
 use utilities;
 
 #User Input
-my $knownFile = '../../data/testTrain/known';
-my $trueFile = '../../data/testTrain/true';
-my $reducedVocabSize = 10000;
+my $knownFile = '../../data/testTrain/known_newSmall';
+my $trueFile = '../../data/testTrain/true_newSmall';
+my $reducedVocabSize = 5000;
 
 #Auto-Generated Output FileNames
-my $knownOut = "../../data/testTrain/known_$reducedVocabSize";
-my $trueOut = "../../data/testTrain/true_$reducedVocabSize";
+my $knownOut = "../../data/testTrain/known_newSmall_$reducedVocabSize";
+my $trueOut = "../../data/testTrain/true_newSmall_$reducedVocabSize";
 
 
 
@@ -24,6 +24,7 @@ my $trueOut = "../../data/testTrain/true_$reducedVocabSize";
 #read the matrix and vocab
 my $knownMatrix = &utilities::readSemMedFile($knownFile);
 my ($vocabularyRef, $relationTypesRef) = &utilities::getVocabularyAndPredicateTypes($knownMatrix);
+
 
 #randomly?? select $vocabSize terms
 my %sampledVocab = ();
