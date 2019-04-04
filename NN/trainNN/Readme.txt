@@ -1,6 +1,6 @@
 ############################################################################
 #                                                                          #
-#    NNLBD - Neural Network Literature Based Discovery v0.36               #
+#    NNLBD - Neural Network Literature Based Discovery v0.37               #
 #                                                                          #
 ############################################################################
 
@@ -63,6 +63,7 @@
     
     Here is a typical configuration file content example, let's call it "config.cfg":
     
+        <HintonNetworkMode>:0
         <DebugLog>:1
         <WriteLog>:0
         <Layer1Size>:200
@@ -144,7 +145,8 @@
 #    Configuration File Parameters                                         #
 #                                                                          #
 ############################################################################
-
+    
+    <HintonNetworkMode>     -> Hinton Neural Network Mode (Default: Rumelhart)                                                             [ Type Int: 1 = Hinton / 0 = Rumelhart     ]
     <DebugLog>              -> Prints Debug Statements To The Console                                                                      [ Type Int: 1 = True / 0 = False (Default) ]
     <WriteLog>              -> Writes Debug Statements To A File                                                                           [ Type Int: 1 = True / 0 = False (Default) ]
     <Momentum>              -> Momentum Value                                                                                              [ Type Float - Default: 0.9                ]
@@ -186,11 +188,18 @@
 #                                                                          #
 ############################################################################
 
+    <HintonNetworkMode>       -> Instructs the script to generate a Hinton or Rumelhart Neural Network
+    
+      This parameter specifies the generated neural network to be either a Rumelhart or Hinton network. Setting the variable value to "1" requests
+      a Hinton Neural Network. "0" requests a Rumelhart Neural Network. By default the variable is set to "0" requesting a Rumelhart Network if the
+      user does not specify. Visual depiction images between networks can be seen within the "Visual Mode Depictions" folder. Both types of networks
+      are compatible with all three modes of input (One-Hot, W2V Dense and Association Style Vectors).
+
     <AdjustVectors>           -> Optimizes CUI/Predicate Vectors, Removing Vector Data Not In Training File And Re-organizes Vector Indices
     
       This parameter optimizes user-specified vector data based on the training file. Vectors not present within the training file data are removed
       from the vector specified unique cui and predicate data lists. Hard-Coded vector index:value data is re-mapped based on data present in the
-      training dataset. This optimizes generation of the network matrices/sequences as input-output and reduces network training time complexity
+      training data-set. This optimizes generation of the network matrices/sequences as input-output and reduces network training time complexity
       by reducing the size of the matrices/sequences and total number of elements per vector/number of vectors of each input-output matrix/sequence.
       Sparse, association style sparse and dense vectors are supported.
       

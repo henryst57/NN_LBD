@@ -5,7 +5,7 @@
 #    -------------------------------------------                                           #
 #                                                                                          #
 #    Date:    10/02/2018                                                                   #
-#    Revised: 12/21/2018                                                                   #
+#    Revised: 01/28/2018                                                                   #
 #                                                                                          #
 #    Generates A Neural Network Using A Configuration File.                                #
 #      - Supports Dense and Sparse Input Vectors In All Combinations Of CUI and            #
@@ -28,11 +28,9 @@
 #                                                                                          #
 ############################################################################################
 
-import os, errno
-os.environ['TF_CPP_MIN_LOG_LEVEL']='2'
+import os
 import tensorflow as tf
 import numpy as np
-import pandas as pd
 import scipy.sparse as sparse
 import keras.backend as K
 from tensorflow.python import keras
@@ -40,14 +38,12 @@ from keras.callbacks import CSVLogger
 from keras.models import Model, model_from_json, load_model
 from keras import optimizers
 from keras.utils.vis_utils import plot_model
-from keras.layers import Dense, Activation, Input, concatenate, Dropout, Embedding, Flatten
-from keras.preprocessing.sequence import pad_sequences              # <- Remove Me: Not Used 
+from keras.layers import Dense, Activation, Input, concatenate, Dropout, Embedding, Flatten, GlobalMaxPool1D, Conv1D, GRU
 import h5py
 import sys
 import re
 import gc
 import time
-from fractions import gcd
 
 
 ############################################################################################
@@ -55,7 +51,7 @@ from fractions import gcd
 #    Global Variables / Neural Network Parameters (Default Values)                         #
 #                                                                                          #
 ############################################################################################
-version                         = 0.36
+version                         = 0.38
 number_of_predicates            = 0
 number_of_cuis                  = 0
 layer_1_size                    = 200
@@ -67,6 +63,8 @@ batch_size                      = 10
 momentum                        = 0.9
 dropout_amt                     = 0.25
 negative_sample_rate            = 5
+hinton_network_mode             = 0
+use_class_weights               = 0
 print_key_files                 = 0
 train_file                      = ""
 concept_output_file             = ""
@@ -98,6 +96,7 @@ curr_training_data_index        = 0
 # CUI/Predicate Data
 training_data                   = []
 unique_cui_data                 = {}
+unique_cui_data_weights         = {}
 unique_predicate_data           = {}
 cui_embedding_matrix            = []
 predicate_embedding_matrix      = []
@@ -218,10 +217,12 @@ def ReadConfigFile( config_file_path ):
     global print_key_files
     global number_of_epochs
     global output_file_name
+    global use_class_weights
     global shuffle_input_data
     global testing_stats_file
     global concept_output_file
     global concept_vector_file
+    global hinton_network_mode
     global predicate_list_file
     global training_stats_file
     global negative_sample_rate
@@ -286,6 +287,8 @@ def ReadConfigFile( config_file_path ):
         if data[0] == "OutputFileName"          : output_file_name                = str( data[1] )
         if data[0] == "WeightDumpInterval"      : weight_dump_interval            = int( data[1] )
         if data[0] == "EvaluateFile"            : evaluation_file                 = str( data[1] )
+        if data[0] == "HintonNetworkMode"       : hinton_network_mode             = int( data[1] )
+        if data[0] == "UseClassWeights"         : use_class_weights               = int( data[1] )
 
     f.close()
     
@@ -295,6 +298,14 @@ def ReadConfigFile( config_file_path ):
         PrintLog( "ReadConfigFile() - Setting Debug Log File Name: \"" + debug_file_name + "\"" )
 
     OpenDebugFileHandle()
+    
+    # Discern Neural Network Mode Based On User Settings
+    if( hinton_network_mode is 1 ):
+        PrintLog( "ReadConfigFile() - Hinton Neural Network Mode", 1 )
+        rumelhart_network_mode = 0
+    else:
+        PrintLog( "ReadConfigFile() - Rumelhart Neural Network Mode", 1 )
+        rumelhart_network_mode = 1
 
     # Check(s)
     if( train_file is "" ):
@@ -326,12 +337,12 @@ def ReadConfigFile( config_file_path ):
     if( ( concept_vector_file != "" and CheckIfFileExists( concept_vector_file ) == False )
         or ( predicate_vector_file != "" and CheckIfFileExists( predicate_vector_file ) == False ) ):
         exit()
-
+    
     if( trainable_dense_embeddings is 1 ): trainable_dense_embeddings = True
     else:                                  trainable_dense_embeddings = False
     
-    if( shuffle_input_data is 1 ): shuffle_input_data = True
-    else:                          shuffle_input_data = False
+    if( shuffle_input_data is 1 ):         shuffle_input_data = True
+    else:                                  shuffle_input_data = False
 
     PrintLog( "=========================================================" )
     PrintLog( "~      Neural Network - Literature Based Discovery      ~" )
@@ -347,34 +358,37 @@ def ReadConfigFile( config_file_path ):
     PrintLog( "=========================================================" )
     PrintLog( "-   Configuration File Settings                         -" )
     PrintLog( "=========================================================" )
-
-    PrintLog( "    Train File                 : " + str( train_file ) )
-    PrintLog( "    Concept Vector File        : " + str( concept_vector_file ) )
-    PrintLog( "    Predicate Vector File      : " + str( predicate_vector_file ) )
-    PrintLog( "    Predicate List File        : " + str( predicate_list_file ) )
-    PrintLog( "    Training Stats File        : " + str( training_stats_file ) )
-    PrintLog( "    Testing Stats File         : " + str( testing_stats_file ) )
-    PrintLog( "    Evaluation File            : " + str( evaluation_file ) )
-    PrintLog( "    Output File Name           : " + str( output_file_name ) )
-    PrintLog( "    Batch Size                 : " + str( batch_size ) )
-    PrintLog( "    Learning Rate              : " + str( learning_rate ) )
-    PrintLog( "    Number Of Epochs           : " + str( number_of_epochs ) )
-    PrintLog( "    Number Of Steps            : " + str( steps ) )
-    PrintLog( "    Momentum                   : " + str( momentum ) )
-    PrintLog( "    Dropout AMT                : " + str( dropout_amt ) )
-    PrintLog( "    Layer 1 Size               : " + str( layer_1_size ) )
-    PrintLog( "    Layer 2 Size               : " + str( layer_2_size ) )
-    PrintLog( "    Negative Sample Rate       : " + str( negative_sample_rate ) )
-    PrintLog( "    Print Key Files            : " + str( print_key_files ) )
-    PrintLog( "    Print Network Inputs       : " + str( print_network_inputs ) )
-    PrintLog( "    Print Matrix Stats         : " + str( print_matrix_generation_stats ) )
-    PrintLog( "    Test Input CUI             : " + str( test_input_cui ) )
-    PrintLog( "    Test Input Predicate       : " + str( test_input_predicate ) )
-    PrintLog( "    Test Output CUI            : " + str( test_output_cui ) )
+    
+    PrintLog( "    Rumelhart Network Mode     : " + str( rumelhart_network_mode          ) )
+    PrintLog( "    Hinton Network Mode        : " + str( hinton_network_mode             ) )
+    PrintLog( "    Train File                 : " + str( train_file                      ) )
+    PrintLog( "    Concept Vector File        : " + str( concept_vector_file             ) )
+    PrintLog( "    Predicate Vector File      : " + str( predicate_vector_file           ) )
+    PrintLog( "    Predicate List File        : " + str( predicate_list_file             ) )
+    PrintLog( "    Training Stats File        : " + str( training_stats_file             ) )
+    PrintLog( "    Testing Stats File         : " + str( testing_stats_file              ) )
+    PrintLog( "    Evaluation File            : " + str( evaluation_file                 ) )
+    PrintLog( "    Output File Name           : " + str( output_file_name                ) )
+    PrintLog( "    Batch Size                 : " + str( batch_size                      ) )
+    PrintLog( "    Learning Rate              : " + str( learning_rate                   ) )
+    PrintLog( "    Number Of Epochs           : " + str( number_of_epochs                ) )
+    PrintLog( "    Number Of Steps            : " + str( steps                           ) )
+    PrintLog( "    Momentum                   : " + str( momentum                        ) )
+    PrintLog( "    Dropout AMT                : " + str( dropout_amt                     ) )
+    PrintLog( "    Layer 1 Size               : " + str( layer_1_size                    ) )
+    PrintLog( "    Layer 2 Size               : " + str( layer_2_size                    ) )
+    PrintLog( "    Negative Sample Rate       : " + str( negative_sample_rate            ) )
+    PrintLog( "    Use Class Weights          : " + str( use_class_weights               ) )
+    PrintLog( "    Print Key Files            : " + str( print_key_files                 ) )
+    PrintLog( "    Print Network Inputs       : " + str( print_network_inputs            ) )
+    PrintLog( "    Print Matrix Stats         : " + str( print_matrix_generation_stats   ) )
+    PrintLog( "    Test Input CUI             : " + str( test_input_cui                  ) )
+    PrintLog( "    Test Input Predicate       : " + str( test_input_predicate            ) )
+    PrintLog( "    Test Output CUI            : " + str( test_output_cui                 ) )
     PrintLog( "    Adjust Vectors             : " + str( adjust_for_unidentified_vectors ) )
-    PrintLog( "    Trainable Dense Weights    : " + str( trainable_dense_embeddings ) )
-    PrintLog( "    Shuffle Input Data         : " + str( shuffle_input_data ) )
-    PrintLog( "    Weight Dump Interval       : " + str( weight_dump_interval ) )
+    PrintLog( "    Trainable Dense Weights    : " + str( trainable_dense_embeddings      ) )
+    PrintLog( "    Shuffle Input Data         : " + str( shuffle_input_data              ) )
+    PrintLog( "    Weight Dump Interval       : " + str( weight_dump_interval            ) )
 
     PrintLog( "=========================================================" )
     PrintLog( "-                                                       -" )
@@ -1170,6 +1184,65 @@ def GetConceptUniqueIdentifierData():
     PrintLog( "GetConceptUniqueIdentifierData() - Complete" )
     return 0
 
+#   Reads the training data and generates class weights based on frequency
+def GenerateClassWeights():
+    global unique_cui_data_weights
+    
+    if( use_class_weights is 1 ):
+        PrintLog( "GenerateClassWeights() - Generate Class Weights Enabled" )
+    
+        if( len( training_data ) is 0 ):
+            PrintLog( "GenerateClassWeights() - Error: No Training Data In Memory" )
+            return -1
+        
+        # Get Frequency Counts For Output Classes/CUIs
+        max_cui_name         = ""
+        max_cui_count        = 0
+        object_cui_frequency = {}
+        
+        for line in training_data:
+            elements = re.split( r"\s+", line )
+            
+            # Subject CUI
+            if( elements[0] not in object_cui_frequency ):
+                object_cui_frequency[ elements[0] ] = 1
+            else:
+                object_cui_frequency[ elements[0] ] += 1
+            
+            # Object CUI(s)
+            for output_cui in elements[2:]:
+                if( output_cui not in object_cui_frequency ):
+                    object_cui_frequency[ output_cui ] = 1
+                else:
+                    object_cui_frequency[ output_cui ] += 1
+                
+                # Keep Track Of Highest Output CUI Count
+                if( object_cui_frequency[ output_cui ] > max_cui_count ):
+                    max_cui_name  = output_cui
+                    max_cui_count = object_cui_frequency[ output_cui ]
+        
+        total_object_cuis = sum( object_cui_frequency[cui] for cui in object_cui_frequency )
+        
+        PrintLog( "GenerateClassWeights() - Generated Output/Object CUI Frequencies" )
+        PrintLog( "GenerateClassWeights() - Highest Unique CUI Name: " + str( max_cui_name ) )
+        PrintLog( "GenerateClassWeights() - Highest Unique CUI Count: " + str( max_cui_count ) )
+        PrintLog( "GenerateClassWeights() - Total Object CUIs: " + str( total_object_cuis ) )
+        
+        PrintLog( "GenerateClassWeights() - Generating Object CUI Class Weights" )
+        
+        for object_cui in object_cui_frequency:
+            unique_cui_data_weights[ object_cui ] = max_cui_count / object_cui_frequency[ object_cui ]
+        
+        PrintLog( "GenerateClassWeights() - Weights Generated" ) 
+        PrintLog( "GenerateClassWeights() - Complete" )
+        
+        return 0
+    
+    else:
+        PrintLog( "GenerateClassWeights() - Generate Class Weights Disabled" )
+    
+    return 0
+
 #   Print CUI and Predicate Key Files
 def PrintKeyFiles():
     if( print_key_files is 1 ):
@@ -1211,7 +1284,7 @@ def PrintKeyFiles():
             out_file.close()
 
         PrintLog( "PrintKeyFiles() - File Created" )
-        PrintLog( "PrintKeyFiles() - Printing CUI Key File: " + output_name + ".predicate_key" )
+        PrintLog( "PrintKeyFiles() - Printing Predicate Key File: " + output_name + ".predicate_key" )
 
         try:
             with open( output_name + ".predicate_key", "w" ) as out_file:
@@ -1239,17 +1312,26 @@ def PrintKeyFiles():
     return 0
 
 #   Custom Binary Cross Entropy With Logits Option
-#   The Keras Implementation appears to be incorrect
-def BCE( y_pred, y_true ):
-    #apply sigmoid squashing function to predicted output. Only needed if output is not already probailities (from Logit)
-    y_pred = K.sigmoid(y_pred);
-    #Ensure values are between 0 and 1
-    y_pred = K.clip(y_pred, 0, 1.0);
-
-    #calculate BCE
-    y_pred = (-y_true * K.log(y_pred)) - ((1.0 - y_true) * K.log(1.0 - y_pred));
-    return y_pred;
-
+#   (The Keras Implementation Appears To Be Incorrect - 01/03/2018)
+def BCE( y_true, y_pred ):
+    # Apply Sigmoid Squashing Function To Predicted Output.
+    #   - Only needed if output is not already probabilities (from Logit)
+    y_pred = K.print_tensor(y_pred, message="1 y_pred is: ")
+    y_true = K.print_tensor(y_true, message="1 y_true is: ")
+    #y_pred = K.sigmoid( y_pred )
+    
+    #y_true = K.clip( y_true, K.epsilon(), 1 )
+    y_pred = K.clip( y_pred, K.epsilon(), 1 )
+    y_pred = K.print_tensor(y_pred, message="2 y_pred is: ")
+    y_true = K.print_tensor(y_true, message="2 y_true is: ")
+    # Ensure Values Are Between 0 And 1
+    #y_pred = K.clip( y_pred, 0, 1.0 )
+    
+    # Calculate BCE
+    y_pred = -( y_true * K.log( y_pred ) ) + ( ( 1.0 - y_true ) * K.log( 1.0 - y_pred ) )
+           #= -( y_true * K.log( y_pred ) * weight + ( 1 - y_true ) * K.log( 1 - y_pred ) )
+    y_pred = K.print_tensor(y_pred, message="Final y_pred is: ")
+    return y_pred
 
 #   Custom Metric for Precision
 """ Precision metric.
@@ -1415,6 +1497,7 @@ def GenerateNetworkData( passed_data = None, start_index = None, end_index = Non
     predicate_input_values       = []
     concept_output_indices       = []
     concept_output_values        = []
+    concept_output_weights       = []
 
     # Parses Each Line Of Raw Data Input And Adds Them To Arrays For Matrix Generation
     PrintLog( "GenerateNetworkData() - Parsing CUI Data / Generating Network Input-Output Data Arrays" )
@@ -1541,8 +1624,9 @@ def GenerateNetworkData( passed_data = None, start_index = None, end_index = Non
             predicate_input_indices.append( [predicate_index] )
             number_of_predicate_inputs += 1
         
-        
         # Adds All Object CUI Indices To The Output CUI Index Array
+        weight_value = 0
+        
         for element in line_elements[2:]:
             if( element in unique_cui_data ):
                 object_cui_index = unique_cui_data[element] - 1
@@ -1550,9 +1634,15 @@ def GenerateNetworkData( passed_data = None, start_index = None, end_index = Non
                 concept_output_indices.append( [ index, object_cui_index ] )
                 concept_output_values.append( 1 )
                 number_of_object_cui_outputs += 1
+                
+                if( use_class_weights is 1 ):
+                    weight_value += ( unique_cui_data_weights[ element ] )
+                
+                # Fetch Output CUI Weights And Create List Of Weights Per One-Hot Output Index
+        if( use_class_weights is 1 ):
+            concept_output_weights.append( [ weight_value ] )
         
         index += 1
-
     
     # Set Global Variable
     curr_training_data_index += len( temp_data )
@@ -1609,21 +1699,28 @@ def GenerateNetworkData( passed_data = None, start_index = None, end_index = Non
     PrintLog( "GenerateNetworkData() - Transposing Index Data Arrays Into Row/Column Data" )
     if( cui_dense_input_mode       is False ): concept_input_row,   concept_input_column   = zip( *concept_input_indices   )
     if( predicate_dense_input_mode is False ): predicate_input_row, predicate_input_column = zip( *predicate_input_indices )
-    concept_output_row,  concept_output_column  = zip( *concept_output_indices  )
+    concept_output_row,  concept_output_column  = zip( *concept_output_indices )
 
     # Convert Row/Column Data Into Sparse Matrices
     PrintLog( "GenerateNetworkData() - Converting Index Data Into Matrices" )
     if( cui_dense_input_mode       is False ):
-        concept_input_matrix   = sparse.csr_matrix( ( concept_input_values,           ( concept_input_row,   concept_input_column ) ),   shape = ( number_of_subject_cui_inputs, matrix_cui_length ) )
+        concept_input_matrix   = sparse.csr_matrix( ( concept_input_values,   ( concept_input_row,   concept_input_column ) ),   shape = ( number_of_subject_cui_inputs, matrix_cui_length ) )
     else:
         concept_input_matrix   = np.asarray( concept_input_indices )
     
     if( predicate_dense_input_mode is False ):
-        predicate_input_matrix = sparse.csr_matrix( ( predicate_input_values,         ( predicate_input_row, predicate_input_column ) ), shape = ( number_of_predicate_inputs,   matrix_predicate_length ) )
+        predicate_input_matrix = sparse.csr_matrix( ( predicate_input_values, ( predicate_input_row, predicate_input_column ) ), shape = ( number_of_predicate_inputs,   matrix_predicate_length ) )
     else:
         predicate_input_matrix = np.asarray( predicate_input_indices )
     
-    concept_output_matrix  = sparse.csr_matrix( ( [1]*len( concept_output_indices ),  ( concept_output_row,  concept_output_column ) ),  shape = ( number_of_subject_cui_inputs, matrix_cui_length ) )
+    concept_output_matrix      = sparse.csr_matrix( ( concept_output_values,  ( concept_output_row,  concept_output_column ) ),  shape = ( number_of_subject_cui_inputs, matrix_cui_length ) )
+    
+    if( use_class_weights is 1 ):
+        #concept_output_weights = sparse.csr_matrix( ( concept_output_weights, ( concept_output_row,  concept_output_column ) ),  shape = ( number_of_subject_cui_inputs, matrix_cui_length ) )
+        #concept_output_weights = concept_output_weights.todense()
+        PrintLog( "" )
+    else:
+        concept_output_weights = None
     
     # Print Sparse Matrices
     if( print_network_inputs is 1 ):
@@ -1648,26 +1745,32 @@ def GenerateNetworkData( passed_data = None, start_index = None, end_index = Non
             PrintLog( "GenerateNetworkData() - Original Dense Formatted Sparse Matrix - Predicates" )
             PrintLog( predicate_input_matrix.todense() )
         
-        PrintLog( "GenerateNetworkMatrices() - Compressed Sparse Matrix - Object CUIs" )
+        PrintLog( "GenerateNetworkData() - Compressed Sparse Matrix - Object CUIs" )
         PrintLog( concept_output_matrix )
-        PrintLog( "GenerateNetworkMatrices() - Original Dense Formatted Sparse Matrix - Object CUIs" )
+        PrintLog( "GenerateNetworkData() - Original Dense Formatted Sparse Matrix - Object CUIs" )
         PrintLog( concept_output_matrix.todense() )
+        
+        if( use_class_weights is 1 ):
+            PrintLog( "GenerateNetworkData() - Object CUI Weights" )
+            PrintLog( concept_output_weights )
+        
         PrintLog( "GenerateNetworkData() - =========================================================" )
         PrintLog( "GenerateNetworkData() - =                                                       =" )
         PrintLog( "GenerateNetworkData() - =========================================================" )
     
     PrintLog( "GenerateNetworkData() - Complete" )
     
-    return concept_input_matrix, predicate_input_matrix, concept_output_matrix
+    return concept_input_matrix, predicate_input_matrix, concept_output_matrix, concept_output_weights
 
 
 """
-    Creates A Keras Neural Network Using Input/Output Sparse Matrices and Returns The Network
+    Creates A Keras Neural Network Using Input/Output Sparse Matrices and/or Dense Sequence Arrays,
+    Then Returns The Network
 
     Returns
     --------
      Model
-      The neural network model
+      The neural network model (Rumelhart or Hinton)
 """
 def GenerateNeuralNetwork():
     # Build The Layers As Designed
@@ -1677,14 +1780,16 @@ def GenerateNeuralNetwork():
     cui_input_layer         = None
     pred_input_layer        = None
     concept_layer           = None
+    relation_layer          = None
     know_in                 = None
-    know_layer_input_dim    = 0
+    know_in_name            = None
+    know_layer_name         = None
 
     # CUI Input Layer To Concept Layer
     # Dense CUI Input
     if( cui_dense_input_mode is True ):
         PrintLog( "GenerateNeuralNetwork() - Generating \"Localist_Concept_Input\" Layer, Type: Int32, Shape: ( 1, )" )
-        cui_input_layer  = Input( shape = ( 1, ), dtype = 'int32', name = 'Localist_Concept_Input' )                                        # CUI Input Layer
+        cui_input_layer  = Input( shape = ( 1, ), dtype = 'int32', name = 'Localist_Concept_Input' )                                                          # CUI Input Layer
 
         PrintLog( "GenerateNeuralNetwork() - Generating \"CUI_Dense_Weights\" Embedding Layer, # Of Elements: " + str( number_of_cuis + 1 ) + ", Vector Length: " + str( cui_vector_length ) + ", Input Length: 1, Trainable: " + str( trainable_dense_embeddings ) )
         cui_word_embedding_layer = Embedding( number_of_cuis + 1, cui_vector_length, weights=[cui_embedding_matrix], input_length = 1, name = "CUI_Dense_Weights", trainable = trainable_dense_embeddings )( cui_input_layer )
@@ -1692,7 +1797,7 @@ def GenerateNeuralNetwork():
         PrintLog( "GenerateNeuralNetwork() - Appending Flatten Layer: \"CUI_Weight_Dimensionality_Reduction\" To Embedding Layer: \"CUI_Dense_Weights\"" )
         cui_word_embedding_layer = Flatten( name = "CUI_Weight_Dimensionality_Reduction" )( cui_word_embedding_layer )
 
-        PrintLog( "GenerateNeuralNetwork() - Generating Concept Layer: \"Internal_Distributed_Concept_Representation\" From Embedding Layer \"CUI_Weight_Dimensionality_Reduction\", Units: " + str( layer_1_size ) + ", Activation: ReLU, Input Dim: " + str( number_of_cuis ) )
+        PrintLog( "GenerateNeuralNetwork() - Generating Concept Layer: \"Internal_Distributed_Concept_Representation\" From Embedding Layer: \"CUI_Weight_Dimensionality_Reduction\", Units: " + str( layer_1_size ) + ", Activation: ReLU, Input Dim: " + str( cui_vector_length ) )
         concept_layer            = Dense( units = layer_1_size, activation = 'relu', input_dim = cui_vector_length, name = 'Internal_Distributed_Concept_Representation' )( cui_word_embedding_layer )
 
     # Sparse CUI Input
@@ -1700,62 +1805,89 @@ def GenerateNeuralNetwork():
         PrintLog( "GenerateNeuralNetwork() - Generating \"Localist_Concept_Input\" Layer, Type: Float32, Shape: ( " + str( number_of_cuis ) + ", )" )
         cui_input_layer     = Input( shape = ( number_of_cuis, ), dtype = 'float32', name = 'Localist_Concept_Input' )                                        # CUI Input Layer
 
-        PrintLog( "GenerateNeuralNetwork() - Appending Concept Layer: \"Internal_Distributed_Concept_Representation\" To Input Layer \"Localist_Concept_Input\", Units: " + str( layer_1_size ) + ", Activation: ReLU, Input Dim: " + str( number_of_cuis ) )
+        PrintLog( "GenerateNeuralNetwork() - Appending Concept Layer: \"Internal_Distributed_Concept_Representation\" To Input Layer: \"Localist_Concept_Input\", Units: " + str( layer_1_size ) + ", Activation: ReLU, Input Dim: " + str( number_of_cuis ) )
         concept_layer       = Dense( units = layer_1_size, activation = 'relu', input_dim = number_of_cuis, name = 'Internal_Distributed_Concept_Representation' )( cui_input_layer )
-
-    # Adjust "know_layer" Input Dim
-    know_layer_input_dim = layer_1_size
 
     # Predicate Layer
     # Dense Predicate Input
     if( predicate_dense_input_mode is True ):
         PrintLog( "GenerateNeuralNetwork() - Generating \"Localist_Relation_Input\" Layer, Type: Int32, Shape: ( 1, )" )
-        pred_input_layer          = Input( shape = ( 1, ), dtype = 'int32', name = 'Localist_Relation_Input' )                                  # Predicate Input Layer
+        pred_input_layer          = Input( shape = ( 1, ), dtype = 'int32', name = 'Localist_Relation_Input' )                                                # Predicate Input Layer
 
         PrintLog( "GenerateNeuralNetwork() - Generating \"Predicate_Dense_Weights\" Embedding Layer, # Of Elements: " + str( number_of_predicates + 1 ) + ", Vector Length: " + str( predicate_vector_length ) + ", Input Length: 1, Trainable: " + str( trainable_dense_embeddings ) )
         pred_word_embedding_layer = Embedding( number_of_predicates + 1, predicate_vector_length, weights=[predicate_embedding_matrix], input_length = 1, name = "Predicate_Dense_Weights", trainable = trainable_dense_embeddings )( pred_input_layer )
 
         PrintLog( "GenerateNeuralNetwork() - Appending Flatten Layer: \"Predicate_Weight_Dimensionality_Reduction\" To Embedding Layer: \"Predicate_Dense_Weights\"" )
         pred_word_embedding_layer = Flatten( name = "Predicate_Weight_Dimensionality_Reduction" )( pred_word_embedding_layer )
-
-        PrintLog( "GenerateNeuralNetwork() - Generating Concatenate Layer: \"Internal_Distributed_Relation_Representation_Input\" From Concatenating Concept Layer: \"Internal_Distributed_Concept_Representation\" And Embedding Layer \"Predicate_Weight_Dimensionality_Reduction\"" )
-        know_in                   = concatenate( [concept_layer, pred_word_embedding_layer], name = "Internal_Distributed_Relation_Representation_Input" )                                                        # Concatenate The Predicate Layer To The CUI Layer
-
-        # Adjust "know_layer" Input Dim
-        know_layer_input_dim += predicate_vector_length
+        
+        if( hinton_network_mode is 1 ):
+            PrintLog( "GenerateNeuralNetwork() - Generating Relation Layer: \"Internal_Distributed_Relation_Representation\" From Embedding Layer: \"Predicate_Weight_Dimensionality_Reduction\", Units: " + str( layer_1_size ) + ", Activation: ReLU, Input Dim: " + str( number_of_predicates ) )
+            relation_layer            = Dense( units = layer_1_size, activation = 'relu', input_dim = predicate_vector_length, name = 'Internal_Distributed_Relation_Representation' )( pred_word_embedding_layer )
+        
+            PrintLog( "GenerateNeuralNetwork() - Generating Concatenate Layer: \"Internal_Distributed_Proposition_Representation_Input\" From Concatenating Concept Layer: \"Internal_Distributed_Concept_Representation\" And Relation Layer: \"Internal_Distributed_Relation_Representation\"" )
+            know_in                   = concatenate( [concept_layer, relation_layer], name = "Internal_Distributed_Proposition_Representation_Input" )                                    # Concatenate The CUI Layer To Predicate Layer
+            
+            know_in_name    = "Internal_Distributed_Proposition_Representation_Input"
+            know_layer_name = "Internal_Distributed_Proposition_Representation"
+        else:
+            PrintLog( "GenerateNeuralNetwork() - Generating Concatenate Layer: \"Internal_Distributed_Relation_Representation_Input\" From Concatenating Concept Layer: \"Internal_Distributed_Concept_Representation\" And Embedding Layer: \"Predicate_Weight_Dimensionality_Reduction\"" )
+            know_in                   = concatenate( [concept_layer, pred_word_embedding_layer], name = "Internal_Distributed_Relation_Representation_Input" )                           # Concatenate The Predicate Layer To The CUI Layer
+            
+            know_in_name    = "Internal_Distributed_Relation_Representation_Input"
+            know_layer_name = "Internal_Distributed_Relation_Representation"
 
     # Sparse Predicate Input
     else:
         PrintLog( "GenerateNeuralNetwork() - Generating \"Localist_Relation_Input\" Layer, Type: Float32, Shape: ( " + str( number_of_predicates ) + ", )" )
-        pred_input_layer     = Input( shape = ( number_of_predicates, ), dtype = 'float32', name = 'Localist_Relation_Input' )                                  # Predicate Input Layer
-
-        PrintLog( "GenerateNeuralNetwork() - Generating Concatenate Layer: \"Internal_Distributed_Relation_Representation_Input\" From Concept Layer: \"Internal_Distributed_Concept_Representation\" And Predicate Input Layer \"Localist_Relation_Input\"" )
-        know_in              = concatenate( [concept_layer, pred_input_layer], name = "Internal_Distributed_Relation_Representation_Input" )                                                                 # Concatenate The Predicate Layer To The CUI Layer
-
-        # Adjust "know_layer" Input Dim
-        know_layer_input_dim += number_of_predicates
-
+        pred_input_layer     = Input( shape = ( number_of_predicates, ), dtype = 'float32', name = 'Localist_Relation_Input' )                                                           # Predicate Input Layer
+        
+        if( hinton_network_mode is 1 ):
+            PrintLog( "GenerateNeuralNetwork() - Appending Relation Layer: \"Internal_Distributed_Relation_Representation\" To Input Layer: \"Localist_Relation_Input\", Units: " + str( layer_1_size ) + ", Activation: ReLU, Input Dim: " + str( number_of_predicates ) )
+            relation_layer       = Dense( units = layer_1_size, activation = 'relu', input_dim = number_of_predicates, name = 'Internal_Distributed_Relation_Representation' )( pred_input_layer )
+        
+            PrintLog( "GenerateNeuralNetwork() - Generating Concatenate Layer: \"Internal_Distributed_Proposition_Representation_Input\" From Concept Layer: \"Internal_Distributed_Concept_Representation\" And Relation Layer: \"Internal_Distributed_Relation_Representation\"" )
+            know_in              = concatenate( [concept_layer, relation_layer], name = "Internal_Distributed_Proposition_Representation_Input" )                                        # Concatenate The CUI Layer To The Predicate Layer
+            
+            know_in_name    = "Internal_Distributed_Proposition_Representation_Input"
+            know_layer_name = "Internal_Distributed_Proposition_Representation"
+        else:
+            PrintLog( "GenerateNeuralNetwork() - Generating Concatenate Layer: \"Internal_Distributed_Relation_Representation_Input\" From Concept Layer: \"Internal_Distributed_Concept_Representation\" And Predicate Input Layer: \"Localist_Relation_Input\"" )
+            know_in              = concatenate( [concept_layer, pred_input_layer], name = "Internal_Distributed_Relation_Representation_Input" )                                         # Concatenate The Predicate Layer To The CUI Layer
+            
+            know_in_name    = "Internal_Distributed_Relation_Representation_Input"
+            know_layer_name = "Internal_Distributed_Relation_Representation"
+            
     # Build The Rest Of The Network Using The Above Layers
-    PrintLog( "GenerateNeuralNetwork() - Generating Know_Layer: \"Internal_Distributed_Relation_Representation\" From Know_In Layer: \"Internal_Distributed_Relation_Representation_Input\", Units: " + str( layer_2_size ) + ", Activation: ReLU, Input Dim: " + str( know_layer_input_dim ) )
-    know_layer       = Dense( units = layer_2_size, activation = 'relu', input_dim = know_layer_input_dim, name = "Internal_Distributed_Relation_Representation" )( know_in )             # Knowledge Representation Layer
-
-    PrintLog( "GenerateNeuralNetwork() - Generating Dropout Layer: \"Dropout_Layer\" From Know_Layer: \"Internal_Distributed_Relation_Representation\"" )
-    dropper          = Dropout( dropout_amt, name = "Dropout_Layer" )( know_layer )                                                                                         # Define The Dropout
-
+    PrintLog( "GenerateNeuralNetwork() - Generating Know_Layer: \"" + know_layer_name + "\" From Know_In Layer: \"" + know_in_name + "\", Units: " + str( layer_2_size ) + ", Activation: ReLU, Input Dim: " + str( number_of_predicates ) )
+    know_layer       = Dense( units = layer_2_size, activation = 'relu',  input_dim = number_of_predicates, name = know_layer_name )( know_in )                                          # Knowledge Representation Layer
+    
+    # Add "Internal Distributed Output Representation Layer (Hinton Neural Network Mode)
+    if( hinton_network_mode is 1 ):
+        PrintLog( "GenerateNeuralNetwork() - Generating Distributed Layer: \"Distributed_Output_Representation_Layer\" from Know_In Layer: \"" + know_in_name + "\"" )
+        dist_output_layer = Dense( units = layer_2_size, activation = 'relu',  input_dim = number_of_predicates, name = "Internal_Distributed_Output_Representation" )( know_layer )     # Knowledge Representation Layer
+        
+        PrintLog( "GenerateNeuralNetwork() - Generating Dropout Layer: \"Dropout_Layer\" From Know_Layer: \"" + know_layer_name + "\"" )
+        dropper          = Dropout( dropout_amt, name = "Dropout_Layer" )( dist_output_layer )                                                                                           # Define The Dropout
+        
+    else:
+        PrintLog( "GenerateNeuralNetwork() - Generating Dropout Layer: \"Dropout_Layer\" From Know_Layer: \"" + know_layer_name + "\"" )
+        dropper          = Dropout( dropout_amt, name = "Dropout_Layer" )( know_layer )                                                                                                  # Define The Dropout
+    
     PrintLog( "GenerateNeuralNetwork() - Generating Output Layer: \"Localist_Output_Representation\" From Dropout Layer: \"Dropout_Layer\", Units: " + str( number_of_cuis ) + ", Activation: Sigmoid" )
-    cui_output_layer = Dense( units = number_of_cuis, activation = 'sigmoid', name = 'Localist_Output_Representation' )( dropper )                                                        # Define The Output
-
+    cui_output_layer = Dense( units = number_of_cuis, activation = 'sigmoid', name = 'Localist_Output_Representation' )( dropper )                                                   # Define The Output
+    
     # Compile The Network Model Using Input and Output Layers
     PrintLog( "GenerateNeuralNetwork() - Generating Model From Input Layers: \"Localist_Concept_Input\", \"Localist_Relation_Input\" And Output Layer: \"Localist_Output_Representation\"" )
-    model = Model( inputs = [cui_input_layer, pred_input_layer], outputs = [cui_output_layer] )
+    model = Model( inputs = [ cui_input_layer, pred_input_layer ], outputs = [ cui_output_layer ] )
 
     # Create The Optimizers And Metrics For The Output
-    PrintLog( "GenerateNeuralNetwork() - Setting Optimzers: SGD, Learning Rate: " + str( learning_rate ) + ", Momentum: " + str( momentum ) )
+    PrintLog( "GenerateNeuralNetwork() - Setting Optimizers: SGD, Learning Rate: " + str( learning_rate ) + ", Momentum: " + str( momentum ) )
     sgd = optimizers.SGD( lr = learning_rate, momentum = momentum )
 
-    PrintLog( "GenerateNeuralNetwork() - Compiling Model Using, Loss: BCE, Optimizer: SGD, Metrics: Accuracy, Precision, Recall, Matthews Correlation" )
+    PrintLog( "GenerateNeuralNetwork() - Compiling Model Using, Loss: binary_crossentropy, Optimizer: SGD, Metrics: Accuracy, Precision, Recall, Matthews Correlation" )
+    # Old: " loss = BCE " -> Produces Decent Results (Updated BCE Function: 01/13/2018)
     # " loss = 'binary_crossentropy' " Is Also A Keras Built-In Option
-    model.compile( loss = BCE, optimizer = sgd, metrics = ['accuracy', Precision, Recall, Matthews_Correlation] )
+    model.compile( loss = "binary_crossentropy", optimizer = sgd, metrics = [ 'accuracy', Precision, Recall, Matthews_Correlation ] )
 
     # Print Model Summary
     PrintLog( "GenerateNeuralNetwork() - =========================================================" )
@@ -1771,7 +1903,7 @@ def GenerateNeuralNetwork():
     return model
 
 #   Train The Neural Network
-def TrainNeuralNetwork( neural_network_model = None, initial_epoch = None, concept_input = None, predicate_input =  None, concept_output = None ):
+def TrainNeuralNetwork( neural_network_model = None, initial_epoch = None, concept_input = None, predicate_input =  None, concept_output = None, concept_output_weights = None ):
     
     # Check(s)
     if( neural_network_model is None ):
@@ -1798,9 +1930,9 @@ def TrainNeuralNetwork( neural_network_model = None, initial_epoch = None, conce
     
     if( training_stats_file == "" ):
         csv_logger = CSVLogger( output_file_name + "_training_stats.txt", append = True, separator = '\t')
-        neural_network_model.fit( [concept_input, predicate_input], concept_output, callbacks = [csv_logger], shuffle = shuffle_input_data, initial_epoch = initial_epoch, epochs = initial_epoch + 1 )
+        neural_network_model.fit( [concept_input, predicate_input], concept_output, callbacks = [csv_logger], shuffle = shuffle_input_data, initial_epoch = initial_epoch, epochs = initial_epoch + 1, class_weight = concept_output_weights )
     else:
-        neural_network_model.fit( [concept_input, predicate_input], concept_output, shuffle = shuffle_input_data, initial_epoch = initial_epoch, epochs = initial_epoch + 1 )
+        neural_network_model.fit( [concept_input, predicate_input], concept_output, shuffle = shuffle_input_data, initial_epoch = initial_epoch, epochs = initial_epoch + 1, class_weight = concept_output_weights )
 
     PrintLog( "TrainNeuralNetwork() - Finished Model Training" )
     
@@ -1981,7 +2113,7 @@ def ProcessNeuralNetwork():
         WriteStringToTrainingStatsFile( "Epoch\tEpoch_Time\tLoss\tAccuracy\tPrecision\tRecall\tMatthews_Correlation" )
         
         PrintLog( "ProcessNeuralNetwork() - Generating Training CUI Input, Predicate Input and CUI Output Matrices/Sequences" )
-        train_cui_input_matrix, train_predicate_input_matrix, train_cui_output_matrix = GenerateNetworkData()
+        train_cui_input_matrix, train_predicate_input_matrix, train_cui_output_matrix, train_cui_output_weights = GenerateNetworkData()
     
     # Generating File Handle and Matrices For Complete Testing Metrics Per Epoch
     if( process_eval_metrics_per_epoch is 1 ):
@@ -1991,7 +2123,7 @@ def ProcessNeuralNetwork():
         WriteStringToTestingStatsFile( "Epoch\tLoss\tAccuracy\tPrecision\tRecall\tMatthews_Correlation" )
         
         PrintLog( "ProcessNeuralNetwork() - Generating Evaluation CUI Input, Predicate Input and CUI Output Matrices/Sequences" )
-        eval_cui_input_matrix, eval_predicate_input_matrix, eval_cui_output_matrix = GenerateNetworkData( evaluation_data )
+        eval_cui_input_matrix, eval_predicate_input_matrix, eval_cui_output_matrix, eval_cui_output_weights = GenerateNetworkData( evaluation_data )
     
     # Network Runtime Variables
     start_time                   = time.time()
@@ -2005,10 +2137,10 @@ def ProcessNeuralNetwork():
         
         while( number_of_remaining_elements > 0 ):
             PrintLog( "ProcessNeuralNetwork() - Current Epoch: " + str( curr_epoch ) + "/" + str( number_of_epochs ) )
-            cui_input, predicate_input, cui_output = GenerateNetworkData( None, curr_training_data_index, curr_training_data_index + batch_size )
+            cui_input, predicate_input, cui_output, cui_output_weights = GenerateNetworkData( None, curr_training_data_index, curr_training_data_index + batch_size )
             
             PrintLog( "ProcessNeuralNetwork() - Passing Input/Output Sequences/Matrices To Network" )
-            TrainNeuralNetwork( model, curr_epoch, cui_input, predicate_input, cui_output )
+            TrainNeuralNetwork( model, curr_epoch, cui_input, predicate_input, cui_output, cui_output_weights )
             
             number_of_remaining_elements -= batch_size
             PrintLog( "ProcessNeuralNetwork() - Remaining Elements In Epoch: " + str( number_of_remaining_elements ) )
@@ -2184,6 +2316,10 @@ def Main():
     
     if( AdjustVectorIndexData() == -1 ):
         PrintLog( "Main() - Error: Failed To Adjust CUI/Predicate Indexing Data" )
+        exit()
+    
+    if( GenerateClassWeights() == -1 ):
+        PrintLog( "Main() - Error: Failed To Generate Class Weights" )
         exit()
     
     if( PrintKeyFiles() == -1 ):
